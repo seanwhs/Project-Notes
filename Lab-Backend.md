@@ -1,39 +1,65 @@
-# 🔐 BACKEND — FULL REWRITE (Django REST Framework)
+# 🧪 LAB: Building the HSH Sales System Backend (DRF)
 
-**Architecture Characteristics**
+**Objective:** Build a production-ready backend for regulated LPG operations that is **domain-driven, service-oriented, inventory-safe, meter-safe, audit-safe, and report-ready**.
 
-✔ Domain-Driven
-✔ Service-Oriented
-✔ Inventory-Safe
-✔ Meter-Safe
-✔ Audit-Safe
-✔ Report-Ready
+**Prerequisites:**
 
-This backend is designed for **regulated LPG operations**, not CRUD demos.
-
----
-
-## 📦 BACKEND APP STRUCTURE
-
-```
-backend/
-├── accounts/        # Identity & roles
-├── customers/       # Contract & billing rules
-├── depots/          # Physical stock locations
-├── inventory/       # Depot-scoped quantities
-├── distribution/    # Physical stock movement
-├── transactions/    # Billing & sales logic
-├── audit/           # Immutable activity log
-├── reports/         # Read-only finance views
-├── config/
-│   └── urls.py
-```
+* Python 3.11+
+* PostgreSQL or MySQL
+* Django 4.2+
+* Django REST Framework
+* pip, virtualenv
+* Optional: Docker/Docker Compose for containerized setup
 
 ---
 
-# 1️⃣ ACCOUNTS — Identity & Authorization
+## **Step 0 — Setup Environment**
 
-## accounts/models.py
+1. Create a project folder:
+
+```bash
+mkdir hsh_sales_backend
+cd hsh_sales_backend
+```
+
+2. Create a virtual environment:
+
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+venv\Scripts\activate     # Windows
+```
+
+3. Install dependencies:
+
+```bash
+pip install django djangorestframework mysqlclient djangorestframework-simplejwt
+```
+
+4. Start Django project:
+
+```bash
+django-admin startproject config .
+```
+
+5. Create apps:
+
+```bash
+python manage.py startapp accounts
+python manage.py startapp customers
+python manage.py startapp depots
+python manage.py startapp inventory
+python manage.py startapp distribution
+python manage.py startapp transactions
+python manage.py startapp audit
+python manage.py startapp reports
+```
+
+---
+
+## **Step 1 — Accounts: Identity & Authorization**
+
+**1.1 models.py**
 
 ```python
 from django.contrib.auth.models import AbstractUser
@@ -44,19 +70,11 @@ class User(AbstractUser):
         ('ADMIN', 'Admin'),
         ('SALES', 'Sales'),
     )
-
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
     vehicle_no = models.CharField(max_length=20, blank=True, null=True)
 ```
 
-**Invariant**
-
-* Roles are **explicit**, not permission-string based.
-* Vehicles are optional but traceable.
-
----
-
-## accounts/serializers.py
+**1.2 serializers.py**
 
 ```python
 from rest_framework import serializers
@@ -68,9 +86,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'role', 'vehicle_no']
 ```
 
----
-
-## accounts/permissions.py
+**1.3 permissions.py**
 
 ```python
 from rest_framework.permissions import BasePermission
@@ -84,9 +100,7 @@ class IsSales(BasePermission):
         return request.user.is_authenticated and request.user.role == 'SALES'
 ```
 
----
-
-## accounts/views.py
+**1.4 views.py**
 
 ```python
 from rest_framework.viewsets import ModelViewSet
@@ -101,14 +115,13 @@ class UserViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
 ```
 
-✔ Admin-only user management
-✔ No accidental privilege escalation
+**✅ Lab Checkpoint:** Only admin users can create or edit users.
 
 ---
 
-# 2️⃣ CUSTOMERS — Contracts & Rates
+## **Step 2 — Customers: Contracts & Rates**
 
-## customers/models.py
+**2.1 models.py**
 
 ```python
 from django.db import models
@@ -120,7 +133,6 @@ class Customer(models.Model):
     address = models.TextField()
     payment_type = models.CharField(max_length=10, choices=PAYMENT)
 
-    # Contract Rates
     meter_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     rate_9kg = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     rate_12_7kg = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -131,14 +143,7 @@ class Customer(models.Model):
     last_meter_reading = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 ```
 
-**Key Rule**
-
-> Customer rates are **historical truth at point of sale**.
-> Never recomputed retroactively.
-
----
-
-## customers/views.py
+**2.2 views.py**
 
 ```python
 from rest_framework.viewsets import ModelViewSet
@@ -152,11 +157,13 @@ class CustomerViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
 ```
 
+**✅ Lab Checkpoint:** CRUD operations on customers; rates are immutable historically.
+
 ---
 
-# 3️⃣ DEPOTS & INVENTORY — Physical Reality
+## **Step 3 — Depots & Inventory**
 
-## depots/models.py
+**3.1 depots/models.py**
 
 ```python
 from django.db import models
@@ -169,9 +176,7 @@ class Depot(models.Model):
         return self.code
 ```
 
----
-
-## inventory/models.py
+**3.2 inventory/models.py**
 
 ```python
 from django.db import models
@@ -186,14 +191,7 @@ class Inventory(models.Model):
         unique_together = ('depot', 'equipment_name')
 ```
 
-**Invariant**
-
-* Inventory is always **depot-scoped**
-* No global stock illusion
-
----
-
-## inventory/views.py
+**3.3 inventory/views.py**
 
 ```python
 from rest_framework.viewsets import ReadOnlyModelViewSet
@@ -207,14 +205,13 @@ class InventoryViewSet(ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 ```
 
-✔ Inventory is **queryable, not writable**
-✔ All mutations go through services
+**✅ Lab Checkpoint:** Inventory is **queryable only**; mutations go through services.
 
 ---
 
-# 4️⃣ DISTRIBUTION — Stock Movement (Not Sales)
+## **Step 4 — Distribution Service: Atomic Inventory Movement**
 
-## distribution/models.py
+**4.1 models.py**
 
 ```python
 from django.db import models
@@ -224,10 +221,7 @@ from depots.models import Depot
 User = get_user_model()
 
 class Distribution(models.Model):
-    STATUS = [
-        ('COLLECTION', 'Collection'),
-        ('EMPTY_RETURN', 'Empty Return')
-    ]
+    STATUS = [('COLLECTION', 'Collection'), ('EMPTY_RETURN', 'Empty Return')]
 
     distribution_no = models.CharField(max_length=30, unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -238,9 +232,7 @@ class Distribution(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 ```
 
----
-
-## distribution/services.py
+**4.2 services.py**
 
 ```python
 from django.db import transaction
@@ -280,15 +272,13 @@ class DistributionService:
         return dist
 ```
 
-✔ Atomic
-✔ Inventory-safe
-✔ Audited
+**✅ Lab Checkpoint:** Test `DistributionService.create()` and verify inventory is updated atomically.
 
 ---
 
-# 5️⃣ TRANSACTIONS — Billing Core
+## **Step 5 — Transactions & Billing**
 
-## transactions/models.py
+**5.1 models.py**
 
 ```python
 from django.db import models
@@ -306,9 +296,7 @@ class Transaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 ```
 
----
-
-### Meter / Cylinder / Service Lines
+**5.2 MeterSale (example)**
 
 ```python
 class MeterSale(models.Model):
@@ -320,43 +308,64 @@ class MeterSale(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
 ```
 
-(Your CylinderSale & ServiceSale models are already correct and unchanged.)
+**✅ Lab Checkpoint:** Meter readings are updated **only after transaction commit**.
 
 ---
 
-## transactions/services.py
+## **Step 6 — Audit & Reports**
 
-Your service logic is **correct** and **well-structured**.
-Only invariant worth stating explicitly:
-
-> Meter reading updates occur **only after successful transaction commit**
-
-This prevents partial corruption.
+* Audit logs are **append-only**, immutable, and always linked to user actions.
+* Reports modules fetch **flat payloads**, URL-driven filters, admin-only access.
+* Integrate `/api/reports/` views with **serializer + query filters**.
 
 ---
 
-# 6️⃣ AUDIT — Immutable Truth
+## **Step 7 — Optional: Dockerize Backend**
 
-✔ Append-only
-✔ Never edited
-✔ Never deleted
+**docker-compose.yml**:
 
-Your audit implementation is already **clean and correct**.
+```yaml
+version: '3.8'
+services:
+  backend:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: hsh_sales
+      MYSQL_USER: hsh
+      MYSQL_PASSWORD: hsh123
+    ports:
+      - "3306:3306"
+```
 
 ---
 
-# 7️⃣ REPORTS — Finance & Control
+## ✅ Lab Completion Checklist
 
-Your `/reports/` module is **well-designed**:
+* [ ] `accounts` — Admin-only user CRUD
+* [ ] `customers` — Contract & rate-safe
+* [ ] `depots` — Depot-scoped
+* [ ] `inventory` — Query-only, mutations via services
+* [ ] `distribution` — Atomic, inventory-safe, audited
+* [ ] `transactions` — Meter-safe, billing-safe
+* [ ] `audit` — Append-only, immutable
+* [ ] `reports` — Admin-only, filterable, export-ready
+* [ ] Backend is container-ready
+* [ ] Security boundaries respected
 
-✔ Admin-only
-✔ Flat payloads
-✔ URL-driven filters
-✔ Export-ready
-✔ RR7-friendly
+---
 
-No architectural changes required.
-
-
+This lab is **hands-on and workflow-ready**. Each step builds on the previous, guaranteeing **inventory, meter, and audit safety**, as per HSH LPG operational standards.
 
 

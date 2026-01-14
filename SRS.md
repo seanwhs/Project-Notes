@@ -1,6 +1,4 @@
-# 📝 HSH Sales System — Frontend & Backend
-
-## Software Requirements Specification (SRS)
+# 📝 HSH Sales System — Frontend & Backend SRS
 
 **Version:** 1.0
 **Date:** 2026-01-14
@@ -12,49 +10,34 @@
 
 ### 1.1 Purpose
 
-This document defines the **functional and non-functional requirements** for the **HSH Sales System**, a full-stack LPG sales and distribution platform comprising a modern web frontend and a secure RESTful backend.
+Defines the **functional and non-functional requirements** for the **HSH Sales System**, a full-stack LPG sales & distribution platform.
 
-The system delivers:
+**System delivers:**
 
-* **Frontend:** A React single-page application (SPA) built with React Router v7, featuring modular routing, offline capability, and receipt printing integration.
-* **Backend:** A Django REST Framework (DRF) API layer providing secure, role-based access to users, customers, inventory, transactions, deliveries, and audit logs.
+* **Frontend:** React SPA with React Router v7 (loaders & actions), modular routing, offline persistence, and ESC/POS printing integration.
+* **Backend:** Django REST Framework (DRF) API providing secure, role-based access to users, customers, inventory, transactions, deliveries, and audit logs.
 
-This SRS is intended for **software developers, QA engineers, system administrators, architects**, and project stakeholders.
+**Audience:** Developers, QA engineers, system administrators, architects, and project stakeholders.
 
 ---
 
 ### 1.2 Scope
 
-The system includes the following major capabilities:
+#### Frontend
 
-#### Frontend Scope
+* React SPA using **React Router v7** (loaders & actions)
+* Core pages: Dashboard, Customers, Inventory, Transactions, Delivery
+* Declarative fetch & mutation via loaders/actions
+* Offline persistence via LocalStorage
+* Receipt printing via `usePrinter` (ESC/POS placeholder)
 
-* React SPA using **React Router v7 (loaders & actions)**
-* Core pages:
+#### Backend
 
-  * Dashboard
-  * Customers
-  * Inventory
-  * Transactions
-  * Delivery
-* Declarative data fetching and mutation via loaders/actions
-* Offline data persistence using LocalStorage
-* Receipt printing support via ESC/POS (Web Bluetooth placeholder)
-
-#### Backend Scope
-
-* RESTful APIs implemented using Django REST Framework
-* Core modules:
-
-  * Users
-  * Customers
-  * Inventory
-  * Transactions
-  * Distributions
-  * Audit Logs
-* JWT-based authentication and role-based authorization
-* Custom API actions for transaction and batch creation
-* APIs designed for direct consumption by frontend loaders/actions
+* REST APIs with DRF
+* Modules: Users, Customers, Inventory, Transactions, Distributions, Audit
+* JWT authentication and role-based authorization
+* Custom actions for transactions and batch creation
+* APIs designed for **direct consumption by frontend loaders/actions**
 
 ---
 
@@ -62,31 +45,25 @@ The system includes the following major capabilities:
 
 ### 2.1 Frontend Pages & Features
 
-| Page            | Path            | Description                                                   |
-| --------------- | --------------- | ------------------------------------------------------------- |
-| Root            | `/`             | Application shell with header, navigation, and `<Outlet>`     |
-| Dashboard       | `/dashboard`    | KPIs, transaction totals, revenue overview, charts            |
-| Customers       | `/customers`    | Customer CRUD, rate management, search and filtering          |
-| Inventory       | `/inventory`    | Depot-wise stock levels, alerts, CSV/PDF export               |
-| Transactions    | `/transactions` | Transaction creation, listing, payment status tracking        |
-| Delivery        | `/delivery`     | Delivery batch creation, equipment movement, receipt printing |
-| Offline Support | N/A             | Local persistence and queued submissions                      |
-| Printing        | N/A             | Receipt generation via `usePrinter` hook                      |
+| Page            | Path            | Description                                               |
+| --------------- | --------------- | --------------------------------------------------------- |
+| Root            | `/`             | Application shell with header, navigation, and `<Outlet>` |
+| Dashboard       | `/dashboard`    | KPIs, transaction totals, revenue, charts                 |
+| Customers       | `/customers`    | CRUD, rate management, search/filter                      |
+| Inventory       | `/inventory`    | Depot-wise stock, alerts, CSV/PDF export                  |
+| Transactions    | `/transactions` | Create/list transactions, track payment status            |
+| Delivery        | `/delivery`     | Create delivery batches, track equipment, print receipts  |
+| Offline Support | N/A             | Local persistence and queued submissions                  |
+| Printing        | N/A             | Receipt generation via `usePrinter` hook                  |
 
 ---
 
-#### 2.1.1 Loaders and Actions
+#### 2.1.1 Loaders & Actions
 
-* **Loaders**
+* **Loaders:** Fetch data before rendering routes
+* **Actions:** Handle all mutations (POST/PUT)
 
-  * Responsible for fetching data from backend APIs
-  * Executed before route rendering
-* **Actions**
-
-  * Handle all data mutations (POST / PUT)
-  * Represent the only write path from UI to backend
-
-This ensures a **clear separation between reads, writes, and side effects**.
+> Ensures **separation of reads, writes, and side effects**.
 
 ---
 
@@ -121,35 +98,35 @@ This ensures a **clear separation between reads, writes, and side effects**.
 
 ### Security
 
-* JWT-based authentication
-* Role-based access control (Admin, Sales, Supervisor)
-* HTTPS enforced across all environments
+* JWT authentication
+* Role-based access (Admin, Sales, Supervisor)
+* HTTPS enforced
 
 ### Performance
 
-* Dashboard load time < 2 seconds with 1,000+ transactions
-* API response time < 200 ms for standard operations
+* Dashboard load < 2s with 1,000+ transactions
+* API response < 200 ms for standard ops
 
 ### Usability
 
 * Mobile-first, responsive UI
-* Clear navigation and form feedback states
+* Clear navigation and form feedback
 
 ### Reliability
 
-* Offline support with deferred synchronization
-* Graceful handling of API and network failures
+* Offline support with deferred sync
+* Graceful handling of API/network failures
 
 ### Maintainability
 
 * Modular React components
 * DRF ViewSets with consistent patterns
-* Well-documented APIs and services
+* Documented APIs and services
 
 ### Scalability
 
-* Support for multiple depots
-* Hundreds of concurrent authenticated users
+* Multi-depot support
+* Hundreds of concurrent users
 
 ---
 
@@ -175,7 +152,7 @@ This ensures a **clear separation between reads, writes, and side effects**.
 * React SPA
 * React Router v7 (loaders & actions)
 * TailwindCSS
-* LocalStorage-based offline support
+* Offline via LocalStorage
 * Printing via `usePrinter` hook
 
 ### Backend
@@ -191,8 +168,7 @@ This ensures a **clear separation between reads, writes, and side effects**.
 
 ### Deployment
 
-* Dockerized services
-* Cloud-ready architecture
+* Dockerized, cloud-ready architecture
 
 ### Tooling
 
@@ -203,30 +179,31 @@ This ensures a **clear separation between reads, writes, and side effects**.
 
 ## 6️⃣ Assumptions & Dependencies
 
-* All users authenticate with valid credentials
-* Online connectivity is required for real-time sync
+* Valid user authentication required
+* Online connectivity for real-time sync
 * Offline queue handles intermittent network loss
-* Web Bluetooth-compatible hardware is available for printing
-* Backend APIs are consistently available and secured
-* React Router v7 conventions are applied uniformly
+* Web Bluetooth-compatible printer hardware
+* Backend APIs available and secure
+* Uniform React Router v7 conventions applied
 
 ---
 
 ## ✅ Outcome
 
-This SRS serves as a **single source of truth** for the HSH Sales System by defining:
+This SRS provides a **single source of truth**:
 
 * Frontend pages, navigation, and data flows
 * Backend APIs, models, and permissions
 * Loader/action integration patterns
-* Offline-first behavior and printing concerns
-* A scalable, maintainable, production-ready architecture
+* Offline-first and printing behavior
+* Scalable, maintainable, production-ready architecture
 
 ---
 
-### Architectural note (optional, but strong):
+### Architectural Note
 
-> This system deliberately enforces **explicit data boundaries**:
-> UI → Router Actions → APIs → Database.
-> All side effects (writes, printing, offline queuing) are isolated, observable, and testable.
+> Explicit data boundaries enforced:
+> **UI → Router Actions → APIs → Database**
+> All side effects (writes, printing, offline queuing) are **isolated, observable, and testable**.
+
 

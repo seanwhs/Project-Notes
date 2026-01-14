@@ -1,4 +1,3 @@
-
 # 📝 HSH Sales System — Admin Console Software Requirements Specification (SRS)
 
 **Version:** 1.0
@@ -27,7 +26,7 @@ The Admin Console provides:
 * **Audit & Compliance** – Track user actions and generate audit logs.
 * **System Configuration** – Manage depots, equipment types, and application settings.
 
-The Admin Console integrates with the **React Router v7 frontend** and **Django REST Framework backend**.
+The Admin Console integrates seamlessly with the **React Router v7 frontend** and **Django REST Framework backend**.
 
 ### 1.3 Intended Audience
 
@@ -53,15 +52,18 @@ The Admin Console integrates with the **React Router v7 frontend** and **Django 
   * Pending vs Completed Deliveries
   * Inventory Levels (Full vs Empty)
   * Payment Status Overview
+
 * **Graphs & Charts**
 
   * Sales trends over time
   * Inventory by depot
   * Top customers by purchase volume
+
 * **Quick Actions**
 
   * Add Customer, Transaction, or Inventory
   * Batch approval of deliveries
+
 * **Filters:** Date range, depot, customer type
 
 ---
@@ -238,6 +240,5 @@ The Admin Console integrates with the **React Router v7 frontend** and **Django 
 
 ---
 
-✅ **This SRS provides a structured blueprint for developing the Admin Console**, including functional features, non-functional requirements, user stories, and system constraints.
-
+✅ **This SRS provides a structured blueprint for developing the Admin Console**, covering functional features, non-functional requirements, user stories, system architecture, and operational constraints.
 

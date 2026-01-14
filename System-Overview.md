@@ -22,9 +22,9 @@ hsh-sales-system/
 │   └── manage.py
 ├── frontend/          # React SPA (Vite + Router v7)
 │   ├── routes/        # Pages: Dashboard, Customers, Inventory, Transactions, Delivery
-│   ├── hooks/         # usePrinter
+│   ├── hooks/         # usePrinter, other utilities
 │   ├── services/      # OfflineService
-│   └── root.jsx
+│   └── root.jsx       # Root layout + Outlet
 ├── docker-compose.yml
 └── README.md
 ```
@@ -35,12 +35,12 @@ hsh-sales-system/
 
 ### Accounts
 
-| Endpoint      | Method | Auth      | Description    |
-| ------------- | ------ | --------- | -------------- |
-| `/api/users/` | GET    | Admin JWT | List all users |
-| `/api/users/` | POST   | Admin JWT | Create user    |
+| Endpoint      | Method | Auth      | Description     |
+| ------------- | ------ | --------- | --------------- |
+| `/api/users/` | GET    | Admin JWT | List all users  |
+| `/api/users/` | POST   | Admin JWT | Create new user |
 
-**Request Example (POST /api/users/)**
+**POST /api/users/ Example**
 
 ```json
 {
@@ -52,7 +52,7 @@ hsh-sales-system/
 }
 ```
 
-**Response Example**
+**Response**
 
 ```json
 {
@@ -73,7 +73,7 @@ hsh-sales-system/
 | `/api/customers/` | GET    | JWT  | List customers   |
 | `/api/customers/` | POST   | JWT  | Add new customer |
 
-**Request Example**
+**POST Example**
 
 ```json
 {
@@ -88,10 +88,10 @@ hsh-sales-system/
 
 ### Inventory
 
-| Endpoint          | Method | Auth      | Notes               |
-| ----------------- | ------ | --------- | ------------------- |
-| `/api/inventory/` | GET    | JWT       | List stock items    |
-| `/api/inventory/` | POST   | Admin JWT | Add or adjust stock |
+| Endpoint          | Method | Auth      | Notes            |
+| ----------------- | ------ | --------- | ---------------- |
+| `/api/inventory/` | GET    | JWT       | List stock items |
+| `/api/inventory/` | POST   | Admin JWT | Add/adjust stock |
 
 ---
 
@@ -102,7 +102,7 @@ hsh-sales-system/
 | `/api/transactions/`           | GET    | JWT  | List all transactions  |
 | `/api/transactions/create_tx/` | POST   | JWT  | Create new transaction |
 
-**Request Example**
+**POST Example**
 
 ```json
 {
@@ -112,7 +112,7 @@ hsh-sales-system/
 }
 ```
 
-**Response Example**
+**Response**
 
 ```json
 {
@@ -134,28 +134,18 @@ hsh-sales-system/
 | `/api/distributions/`              | GET    | JWT  | List distributions               |
 | `/api/distributions/create_batch/` | POST   | JWT  | Batch create (collection/return) |
 
-**Request Example**
+**POST Example**
 
 ```json
 {
   "items": [
-    {
-      "depot": "Main",
-      "equipment": "CYL 14",
-      "quantity": 5,
-      "status": "collection"
-    },
-    {
-      "depot": "Main",
-      "equipment": "CYL 50",
-      "quantity": 2,
-      "status": "empty_return"
-    }
+    { "depot": "Main", "equipment": "CYL 14", "quantity": 5, "status": "collection" },
+    { "depot": "Main", "equipment": "CYL 50", "quantity": 2, "status": "empty_return" }
   ]
 }
 ```
 
-**Response Example**
+**Response**
 
 ```json
 {
@@ -173,9 +163,9 @@ hsh-sales-system/
 
 ---
 
-## 3️⃣ Frontend — React Router v7 — Full Integration
+## 3️⃣ Frontend — React Router v7 Integration
 
-### 3.1 root.jsx
+### root.jsx
 
 ```jsx
 import { Outlet } from "react-router";
@@ -196,7 +186,7 @@ export default function Root() {
 
 ---
 
-### 3.2 Offline Service
+### Offline Service
 
 ```javascript
 export const OfflineService = {
@@ -206,11 +196,12 @@ export const OfflineService = {
 };
 ```
 
-*All forms can auto-save offline using `OfflineService.save('key', formData)`.*
+> 💡 Auto-save forms offline using:
+> `OfflineService.save('delivery', formData)`
 
 ---
 
-### 3.3 Printer Hook
+### Printer Hook
 
 ```javascript
 export function usePrinter() {
@@ -224,10 +215,9 @@ export function usePrinter() {
 
 ---
 
-### 3.4 Loader & Action Patterns
+### Loader & Action Patterns
 
 ```javascript
-// Generic Loader
 export async function loader(endpoint) {
   try {
     const res = await fetch(endpoint);
@@ -238,7 +228,6 @@ export async function loader(endpoint) {
   }
 }
 
-// Generic Action
 export async function action(endpoint, formData) {
   try {
     const res = await fetch(endpoint, {
@@ -254,11 +243,11 @@ export async function action(endpoint, formData) {
 }
 ```
 
-*All routes (`Customers.jsx`, `Transactions.jsx`, `Delivery.jsx`) reuse this loader/action pattern.*
+> ✅ Reusable in all pages (`Customers.jsx`, `Transactions.jsx`, `Delivery.jsx`).
 
 ---
 
-### 3.5 Example — Delivery.jsx
+### Example — Delivery.jsx
 
 ```jsx
 import { Form, useActionData, useNavigation } from "react-router";
@@ -313,13 +302,13 @@ export default function Delivery() {
 }
 ```
 
-*Offline support:* before POST, call `OfflineService.save('delivery', formData)` to queue offline.
+> ⚡ Offline support: call `OfflineService.save('delivery', formData)` before POST.
 
 ---
 
 ## 4️⃣ Transaction Lifecycle (Frontend ↔ Backend)
 
-1. User fills **form** → offline queue save optional.
+1. User fills **form** → optionally save offline.
 2. React Router **action** posts data to backend API.
 3. Backend validates user, updates inventory, creates transaction/distribution.
 4. Backend triggers **PDF invoice generation + email**.
@@ -344,7 +333,7 @@ Volumes:
 
 ## 6️⃣ Key Features — v3.0
 
-* **Fully decoupled** frontend & backend
+* Fully **decoupled frontend & backend**
 * **Offline-first SPA** with auto-sync queue
 * **Bluetooth thermal printing** (ESC/POS)
 * **PDF invoice generation + automated email**
@@ -354,5 +343,4 @@ Volumes:
 * **React Router v7 loaders/actions** fully integrated
 * **Mobile-first UI**, optimized for tablets & phones
 * **Loader/action helpers** for easy form + fetch reuse
-
 

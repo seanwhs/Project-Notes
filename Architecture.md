@@ -6,7 +6,7 @@
 
 ## 1️⃣ Executive Overview
 
-The **HSH Sales System** is a **full-stack LPG sales, delivery, and logistics platform** designed to support field operations, inventory integrity, billing accuracy, and regulatory auditability.
+The **HSH Sales System** is a **full-stack LPG sales, delivery, and logistics platform** designed to support **field operations, inventory integrity, billing accuracy, and regulatory auditability**.
 
 The system is built with an **offline-first, security-aware architecture**, ensuring uninterrupted operations in low-connectivity environments while maintaining strict backend authority over inventory, pricing, and transactions.
 
@@ -17,19 +17,23 @@ The system is built with an **offline-first, security-aware architecture**, ensu
   * Online/offline transaction capture
   * Delivery and empty-return batch handling
   * Immediate receipt printing
+
 * **Inventory Management**
 
   * Real-time full/empty cylinder tracking
   * Server-enforced consistency rules
+
 * **Transaction & Billing**
 
   * Sales processing
   * Automated invoice generation
   * Email dispatch
+
 * **Audit & Compliance**
 
   * Immutable action logging
   * Role-based access enforcement
+
 * **Reporting & Analytics**
 
   * Filterable transaction history
@@ -55,18 +59,12 @@ The system is built with an **offline-first, security-aware architecture**, ensu
 
 ## 3️⃣ Design Principles & Goals
 
-1. **Strict frontend/backend separation**
-   UI never owns business truth.
-2. **Offline-first reliability**
-   Field operations continue regardless of connectivity.
-3. **Backend-owned invariants**
-   Inventory, pricing, and numbering are server-controlled.
-4. **Auditability by design**
-   All critical actions are logged.
-5. **Role-based access control**
-   Clear Admin vs Sales responsibility boundaries.
-6. **Operational portability**
-   Dockerized, environment-driven deployment.
+1. **Strict frontend/backend separation** – UI never owns business truth
+2. **Offline-first reliability** – Field operations continue regardless of connectivity
+3. **Backend-owned invariants** – Inventory, pricing, and numbering are server-controlled
+4. **Auditability by design** – All critical actions are logged
+5. **Role-based access control** – Clear Admin vs Sales responsibility boundaries
+6. **Operational portability** – Dockerized, environment-driven deployment
 
 ---
 
@@ -98,8 +96,8 @@ Database (MySQL)
 ```
 ┌─────────┐   ┌─────────┐   ┌─────────────┐
 │Frontend │   │Backend  │   │MySQL        │
-│:5173   │   │:8000    │   │:3306        │
-│Vol:/app│   │Vol:/app │   │Vol:mysql_data
+│:5173    │   │:8000    │   │:3306        │
+│Vol:/app │   │Vol:/app │   │Vol:mysql_data
 └─────────┘   └─────────┘   └─────────────┘
 ```
 
@@ -275,10 +273,6 @@ python manage.py createsuperuser
 
 ## 1️⃣ Transaction Creation Flow
 
-### Intent
-
-Create a sales transaction with optional offline handling and receipt printing.
-
 ```
 User
  │
@@ -311,7 +305,7 @@ Response JSON
 UI Update → Optional Print
 ```
 
-**Notes**
+**Notes:**
 
 * All mutations flow through router actions
 * Pricing and inventory logic is backend-owned
@@ -320,10 +314,6 @@ UI Update → Optional Print
 ---
 
 ## 2️⃣ Delivery / Distribution Batch Flow
-
-### Intent
-
-Create a delivery or empty-return batch with backend-generated identifiers.
 
 ```
 User
@@ -353,7 +343,7 @@ AuditLog
 UI Confirmation → Print (optional)
 ```
 
-**Notes**
+**Notes:**
 
 * Batch operations are atomic
 * Inventory changes are server-enforced
@@ -390,4 +380,88 @@ Backend commits & audits
 * Highly testable flows
 * Compliance-ready audit trail
 
+---
+
+# 🏗️ HSH SALES SYSTEM — Full-Stack Architecture Map
+
+```
+                  ┌───────────────────────┐
+                  │        User           │
+                  │  (Sales / Admin)      │
+                  └─────────┬─────────────┘
+                            │
+                            ▼
+            ┌─────────────────────────────────┐
+            │       React SPA (Vite)          │
+            │ Mobile-first UI + TailwindCSS  │
+            ├─────────────────────────────────┤
+            │ Components:                     │
+            │ ├─ MeterSection                 │
+            │ ├─ CylinderSection              │
+            │ ├─ ServiceSection               │
+            │ └─ SummaryBar                   │
+            ├─────────────────────────────────┤
+            │ React Router v7                 │
+            │ ├─ Loader → fetch data          │
+            │ └─ Action → mutations           │
+            └─────────┬───────────────────────┘
+                      │
+                      ▼
+         ┌─────────────────────────────┐
+         │ Offline Queue (LocalStorage) │
+         │ Auto-sync on reconnect       │
+         └─────────┬───────────────────┘
+                   │
+                   ▼
+         ┌─────────────────────────────┐
+         │   Django REST Framework      │
+         │  (Backend API + Domain)     │
+         ├─────────────────────────────┤
+         │ Auth: JWT + RBAC            │
+         │ Services:                   │
+         │ ├─ TransactionService       │
+         │ ├─ DistributionService      │
+         │ ├─ BillingService           │
+         │ ├─ ReportService            │
+         │ └─ AuditService             │
+         └─────────┬───────────────────┘
+                   │
+        ┌──────────┴───────────┐
+        ▼                      ▼
+┌───────────────┐       ┌───────────────┐
+│ Inventory DB  │       │ Transactions  │
+│ (Depot-scoped │       │ & Customer DB │
+│ full/empty)   │       │               │
+└───────────────┘       └───────────────┘
+        │                      │
+        └──────────┬───────────┘
+                   ▼
+             ┌───────────────┐
+             │  AuditLog     │
+             │ Immutable log │
+             └───────────────┘
+                   │
+                   ▼
+             ┌───────────────┐
+             │ Reporting     │
+             │ CSV / Excel   │
+             │ PDF / Email   │
+             └───────────────┘
+                   │
+                   ▼
+             ┌───────────────┐
+             │ Thermal Print │
+             │ ESC/POS       │
+             └───────────────┘
+```
+
+---
+
+**Key Highlights:**
+
+1. Frontend → Backend Flow: React SPA drives workflow UI, with loaders for data and actions for mutations. Offline queue ensures continuity.
+2. Backend Services: Transaction, Distribution, Billing, Report, Audit — all atomic, audited, and backend-owned.
+3. Database: Depot-scoped inventory ensures stock truth; transactions and customers maintain historical integrity.
+4. Printing & Reporting: ESC/POS printing post-commit; flat CSV/PDF export for auditing.
+5. Security: JWT + RBAC enforces Admin vs Sales separation; backend is single source of truth.
 

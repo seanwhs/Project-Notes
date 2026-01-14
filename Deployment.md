@@ -68,6 +68,8 @@ DB_PORT=3306
 DB_ROOT_PASSWORD=rootpass
 ```
 
+> 💡 **Tip:** Use stronger secrets in production; consider `docker secret` or environment injection.
+
 ---
 
 # 🟢 Frontend `.env`
@@ -97,17 +99,17 @@ RUN apt-get update && apt-get install -y \
     default-libmysqlclient-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install
+# Copy requirements and install Python packages
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code
+# Copy backend source code
 COPY . .
 
 # Expose Django port
 EXPOSE 8000
 
-# Run Django dev server
+# Run migrations and start Django dev server
 CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
 ```
 
@@ -134,7 +136,7 @@ COPY . .
 # Expose Vite port
 EXPOSE 5173
 
-# Run Vite dev server
+# Run Vite dev server with host binding
 CMD ["npm", "run", "dev", "--", "--host"]
 ```
 
@@ -161,11 +163,15 @@ python manage.py createsuperuser
 # 🟢 Key Advantages
 
 1. Fully **containerized backend + frontend + MySQL**.
-2. MySQL persists using Docker volumes (`mysql_data`).
-3. No extra manual installation — dependencies installed in containers.
-4. Frontend routes fully compatible with **React Router v7 loaders/actions**.
-5. Offline support available via `OfflineService`.
-6. Printing scaffolded via `usePrinter` hook.
-7. Everything works out-of-the-box after `docker-compose up --build`.
+2. MySQL data persists using Docker volumes (`mysql_data`).
+3. Dependencies installed automatically inside containers — no local setup required.
+4. Frontend routing fully compatible with **React Router v7 loaders/actions**.
+5. Offline support via `OfflineService`.
+6. Thermal printing scaffolded through `usePrinter` hook.
+7. Out-of-the-box functionality after `docker-compose up --build`.
+8. Easy environment configuration through `.env` files.
 
+---
+
+✅ This setup allows developers to **quickly spin up the full HSH Sales System stack**, while keeping **data persistence, offline support, and printing integration** fully functional.
 
