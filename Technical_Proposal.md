@@ -1,40 +1,42 @@
-# 🏗️ HSH SALES SYSTEM — TECHNICAL PROPOSAL & ARCHITECTURE
+# 🏗️ HSH SALES SYSTEM — TECHNICAL PROPOSAL & ARCHITECTURE (Enhanced)
+
+---
 
 ## 1️⃣ Overview
 
-The **HSH Sales System** is a **full-stack enterprise LPG logistics and sales platform** designed for:
+The **HSH Sales System** is a **full-stack enterprise LPG logistics and sales platform** designed to optimize:
 
-* **Field operations** — support online/offline order capture, cylinder distribution, and returns
-* **Inventory management** — track full and empty cylinders, depot-wise
-* **Transaction processing** — sales, meter readings, and billing
-* **Financial documents** — PDF invoices, receipts, and emails
-* **Audit & compliance** — logs user actions for traceability
-* **Reporting** — filtered transaction history and exportable reports
+* **Field operations** — Online/offline order capture, cylinder distribution, and returns
+* **Inventory management** — Track full/empty cylinders depot-wise
+* **Transaction processing** — Sales, meter readings, and billing
+* **Financial documents** — PDF invoices, receipts, and email dispatch
+* **Audit & compliance** — Logs all user actions for traceability
+* **Reporting & analytics** — Filterable transaction history with exportable reports
 
-**Key Objectives**:
+**Key Objectives:**
 
-1. Decoupled, scalable architecture (React SPA + DRF backend)
-2. Offline-first operation for field sales personnel
-3. Audit logging and role-based access control (Admin/Sales)
-4. PDF invoices and email automation for consistency
-5. Cloud-ready deployment using Docker
+1. Decoupled, scalable architecture (React SPA + Django REST Framework backend)
+2. Offline-first operation for field personnel
+3. Audit logging & role-based access control (Admin/Sales)
+4. PDF invoices & email automation for consistency
+5. Cloud-ready deployment with Docker
 
 ---
 
 ## 2️⃣ Technology Stack
 
-| Layer            | Technology / Tool                        | Purpose                                 |
-| ---------------- | ---------------------------------------- | --------------------------------------- |
-| Frontend         | React SPA + React Router v7, TailwindCSS | Mobile-first, offline-capable UI        |
-| Backend          | Django REST Framework, Python 3.11       | REST API, service layer, validation     |
-| Database         | MySQL 8.0                                | ACID-compliant transactions             |
-| Authentication   | JWT (SimpleJWT)                          | Token-based RBAC                        |
-| PDF Generation   | WeasyPrint                               | Server-side PDF rendering with HTML/CSS |
-| Emailing         | Django SMTP / EmailMessage               | PDF invoice dispatch                    |
-| Offline Support  | LocalStorage queue, auto-sync            | Resilient field operations              |
-| Printing         | ESC/POS via Web Bluetooth                | Thermal receipt printing                |
-| Containerization | Docker + Docker Compose                  | Cloud-ready deployment                  |
-| Reporting        | DRF services + WeasyPrint PDF            | Transaction history, filtered reports   |
+| Layer            | Technology / Tool                        | Purpose / Benefit                        |
+| ---------------- | ---------------------------------------- | ---------------------------------------- |
+| Frontend         | React SPA + React Router v7, TailwindCSS | Mobile-first, offline-capable UI         |
+| Backend          | Django REST Framework, Python 3.11       | REST API, business logic, validations    |
+| Database         | MySQL 8.0                                | ACID-compliant transactions, reliability |
+| Authentication   | JWT (SimpleJWT)                          | Token-based RBAC, secure session         |
+| PDF Generation   | WeasyPrint                               | Server-side PDF rendering from HTML/CSS  |
+| Emailing         | Django SMTP / EmailMessage               | Automated PDF invoice dispatch           |
+| Offline Support  | LocalStorage queue, auto-sync            | Field resilience for offline operations  |
+| Printing         | ESC/POS via Web Bluetooth                | Thermal receipt printing                 |
+| Containerization | Docker + Docker Compose                  | Cloud-ready, portable deployment         |
+| Reporting        | DRF + WeasyPrint PDF                     | Filtered, exportable transaction reports |
 
 ---
 
@@ -50,38 +52,38 @@ The **HSH Sales System** is a **full-stack enterprise LPG logistics and sales pl
 ### 3.2 Master Data
 
 * Users
-* Customers & rates
+* Customers & pricing
 * Equipment / cylinders
 * Depot mapping
 
 ### 3.3 Operational Flows
 
 * Cylinder Distribution / Returns
-* Transaction capture
-* Meter readings
-* Inventory updates (atomic)
+* Transaction capture with real-time inventory deduction
+* Meter readings and usage calculations
+* Atomic inventory updates to prevent inconsistencies
 
 ### 3.4 Financial Documents
 
-* Invoice generation (PDF)
-* Email dispatch
+* PDF invoice generation
+* Email dispatch to customers
 * Paid/unpaid status tracking
 
 ### 3.5 Reporting
 
-* Customer sales reports
-* Transaction history
-* Filter and export capabilities
+* Customer-specific sales reports
+* Transaction history with filters
+* Export to PDF/Excel
 
 ### 3.6 Audit & Logging
 
 * User actions (create, update, delete)
-* Rate updates
-* Transaction / billing activities
+* Rate or pricing updates
+* Transaction and billing activities
 
 ---
 
-## 4️⃣ Backend Architecture (DRF)
+## 4️⃣ Backend Architecture (Django REST Framework)
 
 ```
 backend/
@@ -92,30 +94,30 @@ backend/
 │
 ├── apps/
 │   ├── accounts/        # Users, roles, JWT
-│   ├── customers/       # Customer master + rates
+│   ├── customers/       # Customer master & rates
 │   ├── inventory/       # Cylinders, depots, stock
 │   ├── distribution/    # Collection / return workflow
 │   ├── transactions/    # Sales, meter readings
 │   ├── billing/         # PDF invoice, email service
-│   ├── reports/         # Query + export filtered data
+│   ├── reports/         # Filtered transaction exports
 │   └── audit/           # Action logging
 │
 ├── shared/
 │   ├── permissions/     # Role-based access
 │   ├── serializers/     # DRF serializers
-│   └── utils/           # Common helper functions
+│   └── utils/           # Common helpers
 │
 └── manage.py
 ```
 
-### 4.1 Backend Concepts
+### 4.1 Backend Principles
 
-* Service layer separates **business logic** from views
-* Serializer validation for input; domain validation in services
-* Atomic transactions to ensure inventory + transaction consistency
-* PDF generation using **WeasyPrint**
-* Email with PDF attachments
-* Soft deletes + audit logging
+* **Service Layer**: Encapsulates business logic separate from views
+* **Serializer Validation**: Ensures input correctness
+* **Atomic Transactions**: Inventory + transaction consistency
+* **PDF Generation**: Using WeasyPrint from HTML/CSS templates
+* **Email Automation**: Sends invoices/receipts to customers
+* **Soft Deletes + Audit Logging**: Track critical changes without losing data
 
 ---
 
@@ -126,33 +128,33 @@ frontend/
 ├── src/
 │   ├── api/             # Axios / fetch services
 │   ├── auth/            # Login, route guards
-│   ├── components/      # Reusable UI components
+│   ├── components/      # Reusable UI elements
 │   ├── pages/
 │   │   ├── Distribution/
-│   │   ├── Transaction/
+│   │   ├── Transactions/
 │   │   ├── Users/
 │   │   ├── Customers/
 │   │   ├── Reports/
 │   │   └── Login/
 │   ├── hooks/           # Printer, offline sync
-│   ├── utils/           # Helpers, validation
+│   ├── utils/           # Helpers, validators
 │   └── App.jsx
 ```
 
-### 5.1 Frontend Concepts
+### 5.1 Frontend Principles
 
 * Controlled forms with validation
-* Dynamic multi-line items in transaction forms
-* Real-time calculations (latest meter reading - last reading)
+* Dynamic multi-line transaction items
+* Real-time calculations (latest meter reading - previous reading)
 * PDF preview, print, and download (80mm thermal width)
-* Role-based routing
-* Search + dropdown with auto-complete for customers
+* Role-based route guarding
+* Search + autocomplete for customer selection
 
 ---
 
 ## 6️⃣ Database Schema & Logic
 
-### Core Models
+### 6.1 Core Models
 
 ```python
 class Customer(models.Model):
@@ -161,7 +163,7 @@ class Customer(models.Model):
     payment_type = models.CharField(max_length=20, choices=[('Monthly','Monthly'),('Cash','Cash')])
     meter_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     cyl_9_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    # additional cylinder rates (12.7, 14, 50 POL, 50 L)
+    # Add rates for 12.7, 14kg, 50 POL, 50 L
 
 class Transaction(models.Model):
     transaction_id = models.CharField(max_length=20, unique=True)
@@ -178,9 +180,7 @@ class MeterReading(models.Model):
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
 ```
 
----
-
-### 6.1 Database ERD (ASCII)
+### 6.2 Database ERD (ASCII)
 
 ```
 +---------+        +-----------------+        +-------------+
@@ -196,7 +196,7 @@ class MeterReading(models.Model):
 +-----------------+
 | AuditLog        |
 +-----------------+
-Logs actions of User (FK: user_id)
+Logs all user actions (FK: user_id)
 ```
 
 ---
@@ -208,13 +208,16 @@ Logs actions of User (FK: user_id)
 ```python
 from django.core.mail import EmailMessage
 from weasyprint import HTML
+from django.template.loader import render_to_string
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 
 def generate_pdf(transaction):
     html_content = render_to_string('invoice_template.html', {'data': transaction})
     return HTML(string=html_content).write_pdf()
 
 @api_view(['POST'])
-def email_report(request, transaction_id):
+def email_invoice(request, transaction_id):
     transaction = Transaction.objects.get(id=transaction_id)
     pdf_content = generate_pdf(transaction)
     
@@ -229,15 +232,15 @@ def email_report(request, transaction_id):
     return Response({"status": "Success"})
 ```
 
-### 7.2 QuickBooks Integration Logic
+### 7.2 QuickBooks Integration (Optional)
 
-* Runs as **background Celery task**
-* Pushes transaction data to QuickBooks Online via API
+* Executes as **background Celery task**
+* Pushes transactions to QuickBooks Online via API
 * Updates local `qb_synced` flag on success
 
 ```python
 def sync_to_qb(transaction_id):
-    # Map MySQL transaction to QB Invoice
+    # Map MySQL transaction to QB invoice
     # Push via OAuth2 API
     # Mark local transaction as synced
     pass
@@ -247,10 +250,10 @@ def sync_to_qb(transaction_id):
 
 ## 8️⃣ Offline & Printing Strategy
 
-* **Offline Queue**: Transactions stored locally in `LocalStorage`
-* **Auto-sync**: Syncs automatically when network restored
-* **Thermal Printing**: `usePrinter` hook uses ESC/POS via Web Bluetooth
-* **80mm Thermal Paper**: CSS print media queries handle width & margins
+* **Offline Queue**: Unsynced transactions saved in LocalStorage
+* **Auto-sync**: Automatically syncs when network restored
+* **Thermal Printing**: `usePrinter` hook using ESC/POS via Web Bluetooth
+* **80mm Thermal Paper**: CSS print media queries for width & margins
 * **Preview & Download**: FileSaver.js for browser downloads
 
 ---
@@ -265,12 +268,12 @@ def sync_to_qb(transaction_id):
 └─────────┘   └─────────┘   └─────────────┘
 ```
 
-* Docker Compose orchestrates backend, frontend, and database
-* `.env` file manages secrets & DB credentials
-* Cloud-ready: deployable on AWS, GCP, Azure
-* Persistent storage for MySQL via Docker volumes
+* Docker Compose orchestrates frontend, backend, and database
+* `.env` manages secrets & DB credentials
+* Cloud-ready deployment on AWS, GCP, or Azure
+* Persistent MySQL storage via Docker volumes
 
-**Quick Start**:
+**Quick Start:**
 
 ```bash
 docker-compose up --build
@@ -286,18 +289,17 @@ python manage.py createsuperuser
 | ---------------------- | ---------------------------------------- | --------- |
 | Stand-alone System     | React + DRF + MySQL + PDF + Email + RBAC | 16,000    |
 | QuickBooks Integration | Inventory + Invoice Sync                 | 13,800    |
-| Cloud Hosting          | Docker-based, Azure/GCP/AWS              | TBD       |
+| Cloud Hosting          | Docker-based, AWS/GCP/Azure              | TBD       |
 
 ---
 
-✅ **This technical proposal includes**:
+✅ **This proposal includes:**
 
-* Full-stack architecture with DRF backend and React frontend
-* Role-based authentication (Admin/Sales) and JWT security
-* PDF invoice generation and email automation
-* Offline-first support and thermal printing
+* Full-stack architecture: DRF backend + React SPA frontend
+* Role-based authentication (Admin/Sales) & JWT security
+* PDF invoice generation & email automation
+* Offline-first support & thermal printing
 * Database schema & ERDs
 * QuickBooks background sync design
-* Dockerized deployment, cloud-ready
-
+* Dockerized, cloud-ready deployment
 

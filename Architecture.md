@@ -1,104 +1,140 @@
-# 🏗️ HSH SALES SYSTEM — DESIGN & ARCHITECTURE DOCUMENT 
+# 🏗️ HSH SALES SYSTEM
 
-## 1️⃣ Overview
-
-The **HSH Sales System** is a **full-stack LPG logistics and sales platform** designed to streamline:
-
-* **Field operations** — support online/offline order capture, delivery, and cylinder returns
-* **Inventory management** — real-time tracking of full and empty cylinders
-* **Transaction processing** — sales, billing, and automated invoicing
-* **Audit & compliance** — action logging and traceability
-* **Reporting & analytics** — filtering and exportable transaction history
-
-**Technology Stack**:
-
-| Layer            | Technology                                         | Notes                               |
-| ---------------- | -------------------------------------------------- | ----------------------------------- |
-| Frontend         | React SPA (Vite), JSX, TailwindCSS                 | Mobile-first, offline-capable       |
-| Backend          | Django REST Framework, Python 3.11                 | Modular services, JWT/RBAC          |
-| Database         | MySQL 8.0                                          | ACID-compliant, persistent          |
-| Containerization | Docker, Docker Compose                             | Consistent environment, portability |
-| Authentication   | JWT (Simple JWT), Role-based Access Control (RBAC) | Admin/Sales segregation             |
-| Offline Support  | LocalStorage queue, auto-sync                      | Field resiliency                    |
-| Printing         | ESC/POS via Web Bluetooth                          | Thermal receipt printing            |
-| Reporting        | Django services + PDF (ReportLab)                  | Invoice & report generation         |
-
-**Design Goals**:
-
-1. **Decoupled frontend/backend** for scalability and maintainability
-2. **Offline-first operations** to ensure continuity without connectivity
-3. **Audit logging** for traceability and compliance
-4. **Automated billing** with PDF/email dispatch
-5. **Role-based access control** (Admin/Sales)
-6. **Dockerized deployment** with MySQL persistence
+## Design & Architecture Document (Refined Edition)
 
 ---
 
-## 2️⃣ System Architecture
+## 1️⃣ Executive Overview
 
-### 2.1 Logical Architecture
+The **HSH Sales System** is a **full-stack LPG sales, delivery, and logistics platform** designed to support field operations, inventory integrity, billing accuracy, and regulatory auditability.
+
+The system is built with an **offline-first, security-aware architecture**, ensuring uninterrupted operations in low-connectivity environments while maintaining strict backend authority over inventory, pricing, and transactions.
+
+### Core Operational Domains
+
+* **Field Operations**
+
+  * Online/offline transaction capture
+  * Delivery and empty-return batch handling
+  * Immediate receipt printing
+* **Inventory Management**
+
+  * Real-time full/empty cylinder tracking
+  * Server-enforced consistency rules
+* **Transaction & Billing**
+
+  * Sales processing
+  * Automated invoice generation
+  * Email dispatch
+* **Audit & Compliance**
+
+  * Immutable action logging
+  * Role-based access enforcement
+* **Reporting & Analytics**
+
+  * Filterable transaction history
+  * Exportable administrative reports
+
+---
+
+## 2️⃣ Technology Stack
+
+| Layer            | Technology                              | Architectural Role                   |
+| ---------------- | --------------------------------------- | ------------------------------------ |
+| Frontend         | React SPA (Vite), JSX, TailwindCSS      | Mobile-first UI, offline-capable     |
+| Routing          | React Router v7 (Data / Framework Mode) | Declarative data loading & mutations |
+| Backend          | Django REST Framework (Python 3.11)     | API, business logic, security        |
+| Database         | MySQL 8.0                               | ACID-compliant persistence           |
+| Authentication   | JWT (SimpleJWT) + RBAC                  | Trust boundary enforcement           |
+| Offline Support  | LocalStorage queue + auto-sync          | Field resiliency                     |
+| Printing         | ESC/POS via Web Bluetooth               | Thermal receipts                     |
+| Reporting        | ReportLab (PDF)                         | Invoices & reports                   |
+| Containerization | Docker + Docker Compose                 | Portable deployment                  |
+
+---
+
+## 3️⃣ Design Principles & Goals
+
+1. **Strict frontend/backend separation**
+   UI never owns business truth.
+2. **Offline-first reliability**
+   Field operations continue regardless of connectivity.
+3. **Backend-owned invariants**
+   Inventory, pricing, and numbering are server-controlled.
+4. **Auditability by design**
+   All critical actions are logged.
+5. **Role-based access control**
+   Clear Admin vs Sales responsibility boundaries.
+6. **Operational portability**
+   Dockerized, environment-driven deployment.
+
+---
+
+## 4️⃣ System Architecture
+
+### 4.1 Logical Architecture
 
 ```
 Frontend (React SPA)
  ├─ Mobile-first UI
- ├─ Offline storage (LocalStorage queue)
+ ├─ React Router loaders & actions
+ ├─ Offline queue (LocalStorage)
  └─ Bluetooth thermal printing
 
 Backend (Django REST Framework)
  ├─ JWT authentication + RBAC
- ├─ Business logic (Distribution, Transactions, Billing)
+ ├─ Domain services (Transactions, Distribution, Billing)
  ├─ Audit logging
- └─ PDF generation & email service
+ └─ PDF generation & email delivery
 
 Database (MySQL)
- ├─ Users, Customers, Inventory, Transactions, AuditLog
- └─ ACID-compliant transactional storage
+ ├─ Users, Customers, Inventory
+ ├─ Transactions, Distributions
+ └─ AuditLog
 ```
 
-### 2.2 Container Architecture
+### 4.2 Container Architecture
 
 ```
 ┌─────────┐   ┌─────────┐   ┌─────────────┐
-│Frontend │   │Backend  │   │DB (MySQL)   │
-│5173     │   │8000     │   │3306         │
-│Vol:/app │   │Vol:/app │   │Vol:mysql_data
+│Frontend │   │Backend  │   │MySQL        │
+│:5173   │   │:8000    │   │:3306        │
+│Vol:/app│   │Vol:/app │   │Vol:mysql_data
 └─────────┘   └─────────┘   └─────────────┘
 ```
 
 ---
 
-## 3️⃣ Module Responsibilities
+## 5️⃣ Domain Modules & Responsibilities
 
-| Module           | Responsibilities                                              |
-| ---------------- | ------------------------------------------------------------- |
-| **Accounts**     | User model, JWT authentication, RBAC                          |
-| **Customers**    | Customer information, payment types, pricing tiers            |
-| **Inventory**    | Cylinder stock tracking (full/empty), consistency enforcement |
-| **Distribution** | Collection & empty return logging, inventory updates          |
-| **Transactions** | Order creation, total calculations, inventory deduction       |
-| **Billing**      | PDF invoice generation, email dispatch                        |
-| **Reports**      | Filtered transaction history and admin reports                |
-| **Audit**        | Logs user actions for compliance                              |
-| **Frontend**     | Mobile-first UI, offline queue, thermal printing              |
-
----
-
-## 4️⃣ Data Model & ERD
-
-### 4.1 Entity Descriptions
-
-| Entity           | Key Fields                                                   | Notes                         |
-| ---------------- | ------------------------------------------------------------ | ----------------------------- |
-| **User**         | `username`, `role` (admin/sales), `vehicle_no`               | Core system user              |
-| **Customer**     | `name`, `payment_type`, `rate_14kg`, `rate_50kg`             | Pricing and billing           |
-| **Inventory**    | `equipment`, `full_qty`, `empty_qty`                         | Cylinder stock tracking       |
-| **Distribution** | `distribution_no`, `user`, `equipment`, `quantity`, `status` | Collection/return operations  |
-| **Transaction**  | `customer`, `user`, `total_amount`, `is_paid`, `created_at`  | Sales records                 |
-| **AuditLog**     | `user`, `action`, `created_at`                               | Action logging for compliance |
+| Module           | Responsibility                                      |
+| ---------------- | --------------------------------------------------- |
+| **Accounts**     | User model, JWT auth, RBAC                          |
+| **Customers**    | Customer profiles, pricing tiers, payment types     |
+| **Inventory**    | Full/empty cylinder tracking and enforcement        |
+| **Distribution** | Delivery batches, empty returns, inventory movement |
+| **Transactions** | Sales creation, totals calculation, stock deduction |
+| **Billing**      | PDF invoice generation and email dispatch           |
+| **Reports**      | Filtered transaction history and admin reports      |
+| **Audit**        | Immutable logging of critical user actions          |
+| **Frontend**     | Mobile UI, offline queue, printing                  |
 
 ---
 
-### 4.2 ASCII ERD Diagram
+## 6️⃣ Data Model Overview
+
+### 6.1 Core Entities
+
+| Entity           | Key Fields                                        | Notes             |
+| ---------------- | ------------------------------------------------- | ----------------- |
+| **User**         | username, role, vehicle_no                        | Sales/Admin users |
+| **Customer**     | name, payment_type, rate_14kg, rate_50kg          | Pricing authority |
+| **Inventory**    | equipment, full_qty, empty_qty                    | Stock truth       |
+| **Distribution** | distribution_no, user, equipment, qty, status     | Delivery batches  |
+| **Transaction**  | customer, user, total_amount, is_paid, created_at | Sales records     |
+| **AuditLog**     | user, action, created_at                          | Compliance trail  |
+
+### 6.2 ERD (ASCII)
 
 ```
 +---------+        +-----------------+        +-------------+
@@ -106,12 +142,12 @@ Database (MySQL)
 +---------+        +-----------------+        +-------------+
       |
       |1
-      * 
+      *
 +-----------------+
 |  Transaction    |*------1
 +-----------------+
       |
-      * 
+      *
 +-----------------+
 |   Customer      |
 +-----------------+
@@ -119,196 +155,239 @@ Database (MySQL)
 +-----------------+
 |   AuditLog      |
 +-----------------+
-Logs actions of User (FK: user_id)
+(User FK)
 ```
 
-> **Notes:**
->
-> * `User` is linked to `Distribution` and `Transaction`.
-> * `Customer` is linked to `Transaction`.
-> * `Inventory` tracks equipment quantities updated via `Distribution` & `Transaction`.
-> * `AuditLog` tracks all critical user actions.
+---
+
+## 7️⃣ Backend Architecture
+
+### 7.1 Configuration
+
+* Environment-based settings (`.env`)
+* MySQL with `STRICT_TRANS_TABLES`
+* JWT authentication (SimpleJWT)
+* CORS enabled for SPA
+* Modular Django apps per domain
+
+### 7.2 Domain Services
+
+| Service                 | Responsibility                       |
+| ----------------------- | ------------------------------------ |
+| **TransactionService**  | Pricing, totals, inventory deduction |
+| **DistributionService** | Batch creation, inventory movement   |
+| **BillingService**      | PDF generation and email             |
+| **ReportService**       | Filtered reporting                   |
+| **AuditService**        | Action logging                       |
+
+### 7.3 Security Model
+
+* JWT authentication
+* Role-based permissions at view level
+* Atomic inventory updates
+* Server-generated identifiers
+* Audit logging on sensitive mutations
 
 ---
 
-## 5️⃣ Backend Architecture
+## 8️⃣ Frontend Architecture
 
-### 5.1 Django Settings
+* React SPA (Vite)
+* React Router v7 (loaders/actions)
+* TailwindCSS (mobile-first)
+* `offline.js` — LocalStorage queue
+* `usePrinter.js` — ESC/POS printing
+* Root layout manages routing, auth state, and layout shell
 
-* Environment-driven config (`.env`) for development, Docker, production
-* MySQL connection with `STRICT_TRANS_TABLES` for ACID compliance
-* JWT authentication using DRF SimpleJWT
-* CORS enabled for SPA access
-* Modular app structure for Accounts, Customers, Inventory, Distribution, Transactions, Billing, Reports, Audit
-
-### 5.2 Services
-
-| Service                 | Responsibilities                                      |
-| ----------------------- | ----------------------------------------------------- |
-| **DistributionService** | Creates distribution records, updates inventory       |
-| **TransactionService**  | Processes sales, deducts inventory, calculates totals |
-| **BillingService**      | Generates PDF invoice, sends email                    |
-| **ReportService**       | Returns filtered transaction history                  |
-| **AuditService**        | Logs user actions (create, update, delete)            |
-
-### 5.3 Security & Permissions
-
-* JWT-based authentication
-* Role-based access (Admin / Sales)
-* Permissions enforced at view level (`IsAdmin`, `IsSales`)
-* Audit logging for sensitive actions
-* Inventory updates atomic to prevent race conditions
+**Offline strategy:**
+Mutations are queued locally and replayed automatically when connectivity is restored.
 
 ---
 
-## 6️⃣ Frontend Architecture
-
-* React SPA (Vite) for performance
-* Mobile-first layout with TailwindCSS
-* Offline queue using LocalStorage
-* Delivery Form: 14kg & 50kg quantities capture
-* Printer Hook (`usePrinter.js`) — ESC/POS via Web Bluetooth
-* Root layout (`root.jsx`) manages routing and containers
-
-**Offline Workflow**: Unsynced transactions stored locally, automatically sync when network is available. Receipts can be printed anytime.
-
----
-
-## 7️⃣ Data Flow Example — Transaction
+## 9️⃣ Transaction Data Flow (High Level)
 
 ```
-User (Sales)
-   │ Initiates transaction
-   ▼
-Frontend SPA
-   │ If offline → save to LocalStorage
-   ▼
-LocalStorage Queue
-   │ Network available? → send to Backend
-   ▼
+User
+ ↓
+React UI
+ ↓
+Router Action
+ ↓
+[Offline? → Local Queue]
+ ↓
 Backend API
-   │ Validate JWT & RBAC
-   │ Deduct inventory (atomic)
-   │ Create Transaction record
-   │ Generate PDF invoice
-   │ Send email
-   │ Log Audit entry
-   ▼
-MySQL DB
-   │ Commit transaction → Inventory updated → Audit logged
-   ▼
-Frontend SPA
-   │ Display confirmation, print receipt
+ ↓
+Domain Service
+ ↓
+MySQL (atomic commit)
+ ↓
+AuditLog
+ ↓
+Frontend confirmation + optional printing
 ```
 
 ---
 
-## 8️⃣ Deployment Architecture
+## 🔟 Deployment Model
 
 * Docker Compose orchestrates:
 
-  * `backend` — Django, port 8000
-  * `frontend` — React SPA, port 5173
-  * `db` — MySQL, port 3306
-* Volume persistence:
+  * `frontend` (5173)
+  * `backend` (8000)
+  * `db` (3306)
+* Persistent volumes for MySQL
+* Secrets managed via `.env`
 
-  * `mysql_data` → MySQL storage
-  * Bind mounts for live code: `./backend`, `./frontend`
-* `.env` contains secrets and DB credentials
-
-**Quick Start**:
+**Bootstrap:**
 
 ```bash
 docker-compose up --build
-docker exec -it hsh-sales-system_backend_1 bash
+docker exec -it backend bash
 python manage.py createsuperuser
 ```
 
-> **Production Notes**: Disable `DEBUG=True`, set strong `SECRET_KEY`, secure DB access.
+---
+
+## 1️⃣1️⃣ Offline & Printing Strategy
+
+* Local queue for unsynced writes
+* Automatic replay on reconnect
+* Immediate ESC/POS receipt printing
+* Printing isolated from persistence logic
 
 ---
 
-## 9️⃣ Offline & Printing
+## 1️⃣2️⃣ Key System Characteristics
 
-* **Offline queue** — `offline.js` stores unsynced transactions
-* **Auto-sync** — automatically syncs when network restored
-* **Thermal printing** — `usePrinter.js` supports ESC/POS via Web Bluetooth
-* Users can print receipts immediately, even while offline
-
----
-
-## 🔟 Features & Highlights
-
-* Decoupled frontend/backend
-* Offline-first with automatic sync
-* Thermal printing support (Bluetooth)
-* PDF invoice generation and email dispatch
-* Audit logging for compliance
-* Role-based access control
-* Dockerized deployment with persistent MySQL storage
-* ACID-compliant transactions for inventory and sales integrity
+* Decoupled architecture
+* Offline-first resilience
+* Backend-owned business truth
+* Thermal printing support
+* Automated billing
+* Audit-ready compliance
+* ACID-safe inventory & transactions
 
 ---
 
-## 1️⃣1️⃣ Diagrams
+# 🔁 Sequence Diagrams — Core Business Flows
 
-### 11.1 System Architecture (ASCII)
+---
 
-```
-Frontend SPA ──HTTPS/REST──> Backend API ──SQL──> MySQL DB
-      │                          │
-      │                          ├─ TransactionService
-      │                          ├─ DistributionService
-      │                          ├─ BillingService
-      │                          ├─ ReportService
-      │                          └─ AuditService
-      │
-      └─ Offline queue & print
-```
+## 1️⃣ Transaction Creation Flow
 
-### 11.2 Container Layout
+### Intent
+
+Create a sales transaction with optional offline handling and receipt printing.
 
 ```
-┌─────────┐   ┌─────────┐   ┌─────────────┐
-│frontend │   │backend  │   │db (MySQL)   │
-│5173     │   │8000     │   │3306         │
-│Vol:/app │   │Vol:/app │   │Vol:mysql_data
-└─────────┘   └─────────┘   └─────────────┘
+User
+ │
+ ▼
+React UI
+ │
+ ▼
+Router Action
+ │
+ ├─ Offline → Queue locally
+ │
+ └─ Online → POST /api/transactions/
+        │
+        ▼
+   DRF View
+        │
+        ▼
+TransactionService
+        │
+        ▼
+MySQL (atomic commit)
+        │
+        ▼
+AuditLog
+        │
+        ▼
+Response JSON
+ │
+ ▼
+UI Update → Optional Print
 ```
 
-### 11.3 Database ERD (ASCII)
+**Notes**
+
+* All mutations flow through router actions
+* Pricing and inventory logic is backend-owned
+* Printing is post-commit and non-blocking
+
+---
+
+## 2️⃣ Delivery / Distribution Batch Flow
+
+### Intent
+
+Create a delivery or empty-return batch with backend-generated identifiers.
 
 ```
-+---------+        +-----------------+        +-------------+
-|  User   |1------*|  Distribution   |*------1|  Inventory  |
-+---------+        +-----------------+        +-------------+
-      |
-      |1
-      * 
-+-----------------+
-|  Transaction    |*------1
-+-----------------+
-      |
-      * 
-+-----------------+
-|   Customer      |
-+-----------------+
+User
+ │
+ ▼
+React UI
+ │
+ ▼
+Router Action
+ │
+ ├─ Offline → Save batch locally
+ │
+ └─ Online → POST /api/distributions/
+        │
+        ▼
+DistributionService
+        │
+        ├─ Generate distribution_no
+        ├─ Apply inventory movement
+        ▼
+MySQL (atomic commit)
+        │
+        ▼
+AuditLog
+ │
+ ▼
+UI Confirmation → Print (optional)
+```
 
-+-----------------+
-|   AuditLog      |
-+-----------------+
-Logs actions of User (FK: user_id)
+**Notes**
+
+* Batch operations are atomic
+* Inventory changes are server-enforced
+* Printing never blocks persistence
+
+---
+
+## 3️⃣ Failure & Recovery Pattern
+
+```
+Network / API Failure
+        ↓
+Router Action catches error
+        ↓
+Offline queue persists payload
+        ↓
+UI indicates "Saved Offline"
+        ↓
+Network restored
+        ↓
+Queued mutations replayed
+        ↓
+Backend commits & audits
 ```
 
 ---
 
-✅ **This document covers**:
+## 4️⃣ Architectural Strengths
 
-* Project structure and module responsibilities
-* Backend & frontend architecture
-* Data flow, offline handling, and printing
-* Database model & ASCII ERDs
-* Security, RBAC, and audit logging
-* Deployment architecture with Docker
-* Professional diagrams suitable for developer onboarding or stakeholder review
+* Clear trust boundaries
+* No UI-owned invariants
+* Offline-safe by construction
+* Side effects isolated
+* Highly testable flows
+* Compliance-ready audit trail
+
 
