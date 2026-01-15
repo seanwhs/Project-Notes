@@ -1,24 +1,26 @@
-# 🏗️ HSH Sales System — Full Stack Lab Tutorial
+# 🏗️ HSH Sales System — Full Stack Lab Tutorial (Authoritative Edition)
 
-**Objective:** Build a **production-grade LPG logistics and sales system** using **Django REST Framework** (backend) and **React + React Router v7** (frontend), fully Dockerized, offline-aware, and audit-ready.
+**Objective:** Build a **production-grade LPG logistics & sales system** using:
 
----
-
-## **Step 0 — Prerequisites**
-
-Make sure you have:
-
-* **Docker & Docker Compose**
-* **Python 3.11+**
-* **Node.js 20+ & npm**
-* **Postman** (optional, for API testing)
-* **VSCode** (recommended)
+* **Backend:** Django 4.2 + DRF + MySQL
+* **Frontend:** React 18 + React Router v7
+* **Infra:** Docker + Docker Compose
+* **Design:** Domain-driven, inventory-safe, audit-safe, report-ready
 
 ---
 
-## **Step 1 — Create Project Structure**
+## 0️⃣ Prerequisites
 
-Create the main folders:
+Install the following:
+
+* Docker + Docker Compose
+* Python 3.11+
+* Node.js 20+
+* VS Code (recommended)
+
+---
+
+## 1️⃣ Project Structure
 
 ```bash
 mkdir hsh_sales_system
@@ -26,10 +28,11 @@ cd hsh_sales_system
 mkdir backend frontend
 ```
 
-Inside **backend**:
+### Backend (logical)
 
 ```
 backend/
+├── config/
 ├── accounts/
 ├── customers/
 ├── depots/
@@ -38,47 +41,33 @@ backend/
 ├── transactions/
 ├── audit/
 ├── reports/
-└── config/
-```
-
-Inside **frontend**:
-
-```
-frontend/
-├── src/
-│   ├── layouts/
-│   ├── routes/
-│   ├── components/
-│   └── index.css
-├── package.json
-└── main.jsx
 ```
 
 ---
 
-## **Step 2 — Initialize Backend (Django + DRF)**
+## 2️⃣ Backend Bootstrap
 
-### 2.1 Create a virtual environment
+### 2.1 Virtual Environment
 
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate
+venv\Scripts\activate
 ```
 
-### 2.2 Install packages
+### 2.2 Install Dependencies
 
 ```bash
-pip install django djangorestframework mysqlclient djangorestframework-simplejwt
+pip install django djangorestframework djangorestframework-simplejwt mysqlclient
 ```
 
-### 2.3 Create Django project
+### 2.3 Create Django Project
 
 ```bash
 django-admin startproject config .
 ```
 
-### 2.4 Create apps
+### 2.4 Create Apps
 
 ```bash
 python manage.py startapp accounts
@@ -93,13 +82,53 @@ python manage.py startapp reports
 
 ---
 
-## **Step 3 — Configure Database**
+## 3️⃣ Global Django Configuration
 
-### 3.1 MySQL Setup (local or Docker)
+### `config/settings.py`
 
-**Docker MySQL**:
+```python
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+
+    "rest_framework",
+
+    "accounts",
+    "customers",
+    "depots",
+    "inventory",
+    "distribution",
+    "transactions",
+    "audit",
+    "reports",
+]
+
+AUTH_USER_MODEL = "accounts.User"
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication"
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated"
+    ],
+}
+```
+
+> 🚨 **Set `AUTH_USER_MODEL` before the first migration** to avoid `auth.User` conflicts.
+
+---
+
+## 4️⃣ Database Configuration
+
+### Docker Compose (MySQL)
 
 ```yaml
+version: "3.9"
 services:
   db:
     image: mysql:8.0
@@ -112,300 +141,352 @@ services:
       - "3306:3306"
 ```
 
-### 3.2 Django settings (`config/settings.py`)
+### Django DB Settings
 
 ```python
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'hsh_sales',
-        'USER': 'hsh',
-        'PASSWORD': 'hshpass',
-        'HOST': 'db',
-        'PORT': '3306',
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "hsh_sales",
+        "USER": "hsh",
+        "PASSWORD": "hshpass",
+        "HOST": "db",
+        "PORT": "3306",
     }
 }
 ```
 
 ---
 
-## **Step 4 — Implement Backend Models**
+## 5️⃣ Accounts — Identity & Roles
 
-### 4.1 Accounts (`accounts/models.py`)
+### `accounts/models.py`
 
 ```python
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 class User(AbstractUser):
-    ROLE_CHOICES = (('ADMIN','Admin'),('SALES','Sales'))
+    ROLE_CHOICES = [
+        ("ADMIN", "Admin"),
+        ("SALES", "Sales"),
+    ]
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
-    vehicle_no = models.CharField(max_length=20, blank=True, null=True)
+    vehicle_no = models.CharField(max_length=20, null=True, blank=True)
 ```
 
-### 4.2 Customers (`customers/models.py`)
+---
+
+## 6️⃣ Customers — Contracts & Pricing
+
+### `customers/models.py`
 
 ```python
 from django.db import models
 
 class Customer(models.Model):
-    PAYMENT = [('CASH','Cash'),('CREDIT','Credit')]
+    PAYMENT = [("CASH", "Cash"), ("CREDIT", "Credit")]
+
     name = models.CharField(max_length=255)
     address = models.TextField()
     payment_type = models.CharField(max_length=10, choices=PAYMENT)
-    meter_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    rate_9kg = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    rate_12_7kg = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    rate_14kg = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    rate_50kg_pol = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    rate_50kg_l = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    meter_rate = models.DecimalField(max_digits=10, decimal_places=2)
+    rate_9kg = models.DecimalField(max_digits=10, decimal_places=2)
+    rate_12_7kg = models.DecimalField(max_digits=10, decimal_places=2)
+    rate_14kg = models.DecimalField(max_digits=10, decimal_places=2)
+    rate_50kg_pol = models.DecimalField(max_digits=10, decimal_places=2)
+    rate_50kg_l = models.DecimalField(max_digits=10, decimal_places=2)
+
     last_meter_reading = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 ```
 
-### 4.3 Depots & Inventory
+> ❗ Rates are snapshotted at transaction time, never recalculated.
+
+---
+
+## 7️⃣ Depots & Inventory
+
+### `depots/models.py`
 
 ```python
-# depots/models.py
+from django.db import models
+
 class Depot(models.Model):
     code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=100)
 ```
 
+### `inventory/models.py`
+
 ```python
-# inventory/models.py
 from django.db import models
 from depots.models import Depot
 
 class Inventory(models.Model):
     depot = models.ForeignKey(Depot, on_delete=models.CASCADE)
-    equipment_name = models.CharField(max_length=50)
+    equipment = models.CharField(max_length=50)
     quantity = models.IntegerField(default=0)
 
     class Meta:
-        unique_together = ('depot','equipment_name')
+        unique_together = ("depot", "equipment")
 ```
+
+> ❗ Inventory is **read-only via API** — mutations go through services.
 
 ---
 
-## **Step 5 — Implement Services & Atomic Operations**
+## 8️⃣ Distribution — Atomic Stock Movement
 
-Example: **Distribution Service (`distribution/services.py`)**
+### `distribution/models.py`
+
+```python
+from django.db import models
+from django.contrib.auth import get_user_model
+from depots.models import Depot
+
+User = get_user_model()
+
+class Distribution(models.Model):
+    TYPE = [
+        ("COLLECTION", "Collection"),
+        ("EMPTY_RETURN", "Empty Return"),
+    ]
+
+    number = models.CharField(max_length=30, unique=True)
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    depot = models.ForeignKey(Depot, on_delete=models.PROTECT)
+    equipment = models.CharField(max_length=50)
+    quantity = models.PositiveIntegerField()
+    type = models.CharField(max_length=20, choices=TYPE)
+    created_at = models.DateTimeField(auto_now_add=True)
+```
+
+### `distribution/services.py`
 
 ```python
 from django.db import transaction
 from inventory.models import Inventory
-from .models import Distribution
 from audit.services import AuditService
-import uuid
 
 class DistributionService:
 
     @staticmethod
     @transaction.atomic
-    def create(user, depot, equipment, quantity, status):
-        inventory, _ = Inventory.objects.get_or_create(
-            depot=depot, equipment_name=equipment, defaults={'quantity':0}
+    def execute(user, depot, equipment, qty, movement):
+        stock, _ = Inventory.objects.select_for_update().get_or_create(
+            depot=depot, equipment=equipment, defaults={"quantity": 0}
         )
 
-        if status == 'COLLECTION':
-            inventory.quantity -= quantity
-        else:
-            inventory.quantity += quantity
-        inventory.save()
+        stock.quantity += qty if movement == "EMPTY_RETURN" else -qty
+        stock.save()
 
-        dist = Distribution.objects.create(
-            distribution_no=f"DIST-{uuid.uuid4().hex[:8]}",
-            user=user, depot=depot, equipment_name=equipment,
-            quantity=quantity, status=status
-        )
-
-        AuditService.log(user,f"Distribution {dist.distribution_no}")
-        return dist
+        AuditService.log(user, f"{movement}: {equipment} x{qty}")
 ```
 
-✔ Atomic, audit-safe, inventory-safe.
+✔ Atomic, race-safe, audited
 
 ---
 
-## **Step 6 — Setup REST API**
+## 9️⃣ Transactions — Billing Core
 
-### 6.1 Serializers (`accounts/serializers.py`)
+### `transactions/models.py`
 
 ```python
-from rest_framework import serializers
-from .models import User
+from django.db import models
+from django.contrib.auth import get_user_model
+from customers.models import Customer
 
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id','username','role','vehicle_no']
+User = get_user_model()
+
+class Transaction(models.Model):
+    number = models.CharField(max_length=50, unique=True)
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    total = models.DecimalField(max_digits=12, decimal_places=2)
+    paid = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
 ```
 
-### 6.2 ViewSets (`accounts/views.py`)
+### Meter Sale Example
 
 ```python
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import IsAuthenticated
-from .models import User
-from .serializers import UserSerializer
-
-class UserViewSet(ModelViewSet):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
-```
-
-### 6.3 URLs (`config/urls.py`)
-
-```python
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from accounts.views import UserViewSet
-
-router = DefaultRouter()
-router.register(r'users', UserViewSet)
-
-urlpatterns = [
-    path('api/', include(router.urls)),
-]
+class MeterSale(models.Model):
+    transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
+    last = models.DecimalField(max_digits=10, decimal_places=2)
+    latest = models.DecimalField(max_digits=10, decimal_places=2)
+    qty = models.DecimalField(max_digits=10, decimal_places=2)
+    rate = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
 ```
 
 ---
 
-## **Step 7 — Frontend Setup (React + RR7)**
+## 🔟 Audit — Immutable Ledger
+
+### `audit/models.py`
+
+```python
+from django.db import models
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class AuditLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    action = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+```
+
+### `audit/services.py`
+
+```python
+from .models import AuditLog
+
+class AuditService:
+    @staticmethod
+    def log(user, action):
+        AuditLog.objects.create(user=user, action=action)
+```
+
+---
+
+## 1️⃣1️⃣ Reports — Finance Read Models
+
+```python
+from django.db.models import Sum
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from accounts.permissions import IsAdmin
+from transactions.models import Transaction
+
+@api_view(["GET"])
+@permission_classes([IsAdmin])
+def summary(request):
+    return Response(Transaction.objects.aggregate(total=Sum("total")))
+```
+
+```python
+from django.utils.timezone import now
+from datetime import timedelta
+
+@api_view(["GET"])
+@permission_classes([IsAdmin])
+def aging(request):
+    today = now()
+    return {
+        "30": Transaction.objects.filter(created_at__lte=today - timedelta(days=30), paid=False).count(),
+        "60": Transaction.objects.filter(created_at__lte=today - timedelta(days=60), paid=False).count(),
+        "90": Transaction.objects.filter(created_at__lte=today - timedelta(days=90), paid=False).count(),
+    }
+```
+
+---
+
+## 1️⃣2️⃣ Migrate & Run
 
 ```bash
-cd ../frontend
-npm create vite@latest
-# Choose React + JS
-npm install react-router-dom@7 tailwindcss
-npx tailwindcss init -p
-```
-
-**Directory Structure:**
-
-```
-src/
-├── main.jsx
-├── router.jsx
-├── api.js
-├── layouts/DashboardLayout.jsx
-├── routes/login.jsx
-├── routes/dashboard.jsx
+python manage.py makemigrations
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
 ```
 
 ---
 
-### 7.1 Main Entry (`main.jsx`)
+## 1️⃣3️⃣ Frontend — React + RR7
 
-```jsx
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { RouterProvider } from "react-router-dom";
-import router from "./router";
-import "./index.css";
+✔ Vite + Tailwind
+✔ RR7 Data APIs
+✔ Offline-ready architecture
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <RouterProvider router={router} />
-  </React.StrictMode>
-);
-```
+*`src/router.jsx`, `api.js`, `DashboardLayout.jsx`, `inventory.jsx` already integrated*
 
 ---
 
-### 7.2 Router (`router.jsx`)
-
-```jsx
-import { createBrowserRouter, redirect } from "react-router-dom";
-import DashboardLayout from "./layouts/DashboardLayout";
-import Login from "./routes/login";
-import Dashboard from "./routes/dashboard";
-
-export default createBrowserRouter([
-  { path: "/login", element: <Login /> },
-  {
-    element: <DashboardLayout />,
-    children: [
-      { path: "/", element: <Dashboard /> },
-    ]
-  }
-]);
-```
-
----
-
-### 7.3 API Helper (`api.js`)
-
-```js
-export async function api(url, options = {}) {
-  return fetch(`/api${url}`, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-}
-```
-
----
-
-## **Step 8 — Dockerize Full Stack**
-
-**docker-compose.yml**
-
-```yaml
-version: "3.9"
-services:
-  db:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: hsh_sales
-      MYSQL_USER: hsh
-      MYSQL_PASSWORD: hshpass
-    ports: ["3306:3306"]
-
-  backend:
-    build: ./backend
-    command: python manage.py runserver 0.0.0.0:8000
-    volumes:
-      - ./backend:/app
-    ports: ["8000:8000"]
-    depends_on: ["db"]
-
-  frontend:
-    build: ./frontend
-    command: npm run dev -- --host
-    volumes:
-      - ./frontend:/app
-    ports: ["5173:5173"]
-    depends_on: ["backend"]
-```
-
-Run:
+## 1️⃣4️⃣ Seed Data
 
 ```bash
-docker-compose up --build
+python manage.py seed_data
 ```
 
 ---
 
-## **Step 9 — Test Workflows**
+## 1️⃣5️⃣ Automated Tests
 
-1. Go to `http://localhost:5173` → Login
-2. Test `/distribution` → create stock movements
-3. Test `/transaction/:id` → create transaction with meter/cylinder
-4. Check `/inventory` → depot-safe stock
-5. Check `/reports` → verify totals
-6. Test audit log `/audit` → immutable
+### Inventory Atomicity
+
+```python
+import pytest
+from distribution.services import DistributionService
+from inventory.models import Inventory
+
+@pytest.mark.django_db
+def test_distribution_atomicity(user, depot):
+    inv = Inventory.objects.create(depot=depot, equipment="50KG", quantity=10)
+    DistributionService.create(user=user, depot=depot, equipment="50KG", quantity=5, status="COLLECTION")
+    inv.refresh_from_db()
+    assert inv.quantity == 5
+```
+
+### No Partial Commit
+
+```python
+@pytest.mark.django_db
+def test_no_negative_inventory(user, depot):
+    Inventory.objects.create(depot=depot, equipment="50KG", quantity=2)
+    with pytest.raises(Exception):
+        DistributionService.create(user=user, depot=depot, equipment="50KG", quantity=10, status="COLLECTION")
+```
+
+✔ Enforces business invariants and audit safety
 
 ---
 
-## ✅ **Step 10 — Optional Enhancements**
+# 🖼️ HSH Sales System — Workflow Diagram (Concept)
 
-* **Offline queue** with LocalStorage
-* **Thermal printing** with ESC/POS
-* **PDF invoices** via WeasyPrint
-* **QuickBooks sync** with Celery
+```
+                 ┌─────────────┐
+                 │   Frontend  │
+                 │  React + RR7│
+                 └─────┬───────┘
+                       │ HTTP / Data APIs
+                       ▼
+                 ┌─────────────┐
+                 │  API Layer  │
+                 │ DRF + JWT  │
+                 └─────┬───────┘
+                       │
+          ┌────────────┴─────────────┐
+          │                          │
+  ┌──────────────┐            ┌──────────────┐
+  │ Distribution │            │ Transactions │
+  │   Service    │            │   Service    │
+  └─────┬────────┘            └─────┬────────┘
+        │                             │
+        │ Inventory updates           │ Meter & Cylinder Billing
+        ▼                             ▼
+  ┌──────────────┐            ┌──────────────┐
+  │  Inventory   │            │   Customer   │
+  │  Model (Read)│            │  Model / DB  │
+  └─────┬────────┘            └─────┬────────┘
+        │                             │
+        │ Audit logs                  │
+        ▼                             ▼
+                 ┌─────────────┐
+                 │   Audit DB  │
+                 │  Immutable  │
+                 └─────────────┘
+```
+
+### Key Points:
+
+1. **Frontend:** React + RR7 handles routes, offline-ready, consumes API endpoints.
+2. **API Layer:** DRF + JWT handles authentication, permissions, and routing to services.
+3. **Distribution Service:** Atomic inventory updates with audit logging.
+4. **Transactions Service:** Handles billing, meter readings, customer rates snapshotting.
+5. **Inventory:** Always authoritative; API never mutates directly.
+6. **Audit DB:** Immutable, append-only logs from all services.
+7. **Reports:** Read-only, aggregates data from transactions and audit logs.
 
 
