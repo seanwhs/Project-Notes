@@ -1,20 +1,27 @@
-# 🧪 HSH Sales System — Full Stack Lab Guide
+# 🧪 HSH Sales System — Full Stack Lab Guide (FINAL)
 
-**Objective:** Deploy a **full-stack HSH Sales System** (Django REST Framework backend + React + RR7 frontend), validate workflow correctness, simulate **load and offline scenarios**, and verify **audit integrity**.
+**Objective:** Deploy and validate a **production-grade full-stack HSH Sales System**
+(**Django REST Framework backend + React 18 + React Router v7 frontend**), then verify:
+
+* Inventory safety
+* Meter correctness
+* Offline tolerance
+* Audit immutability
+* Report accuracy under load
 
 ---
 
-## **Step 0 — Prerequisites**
+## 0️⃣ Prerequisites
 
-* Docker & Docker Compose installed
-* Node.js 20+ and npm
-* Postman or HTTP client for testing
-* Python 3.11+ if running backend outside Docker
+* Docker & Docker Compose
+* Node.js 20+
+* Python 3.11+
+* Postman / curl
 * Recommended: VSCode + Docker extension
 
 ---
 
-## **Step 1 — Project Structure**
+## 1️⃣ Project Structure (Canonical)
 
 ```
 hsh_sales_system/
@@ -25,38 +32,41 @@ hsh_sales_system/
 │   ├── inventory/
 │   ├── distribution/
 │   ├── transactions/
+│   ├── invoices/
 │   ├── audit/
 │   ├── reports/
 │   └── config/
 ├── frontend/
 │   ├── src/
+│   ├── index.html
 │   └── package.json
 ├── docker-compose.yml
 └── README.md
 ```
 
-**Key principle:** Frontend & backend **isolated but networked via Docker**.
+**Rule:**
+Frontend and backend are **isolated**, communicating only over `/api`.
 
 ---
 
-## **Step 2 — Docker Compose Setup**
+## 2️⃣ Docker Compose (Aligned with Backend)
 
-**docker-compose.yml**
+### `docker-compose.yml`
 
 ```yaml
 version: "3.9"
+
 services:
   db:
-    image: mysql:8.0
+    image: postgres:15
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: hsh_sales
-      MYSQL_USER: hsh
-      MYSQL_PASSWORD: hshpass
-    ports:
-      - "3306:3306"
+      POSTGRES_DB: hsh_sales
+      POSTGRES_USER: hsh
+      POSTGRES_PASSWORD: hshpass
     volumes:
-      - db_data:/var/lib/mysql
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
 
   backend:
     build: ./backend
@@ -66,7 +76,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=mysql://hsh:hshpass@db:3306/hsh_sales
+      DATABASE_URL: postgres://hsh:hshpass@db:5432/hsh_sales
     depends_on:
       - db
 
@@ -84,207 +94,262 @@ volumes:
   db_data:
 ```
 
+✔ Matches backend assumptions
+✔ Transaction-safe DB
+✔ Network-isolated services
+
 ---
 
-## **Step 3 — Backend Setup**
+## 3️⃣ Backend Setup & Validation
 
-**1. Install Python requirements**
+### 3.1 Install & migrate
 
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate
-pip install django djangorestframework mysqlclient
-pip install djangorestframework-simplejwt
-```
+pip install -r requirements.txt
 
-**2. Configure `.env`**
-
-```
-SECRET_KEY=supersecret
-DEBUG=1
-DB_NAME=hsh_sales
-DB_USER=hsh
-DB_PASSWORD=hshpass
-DB_HOST=db
-DB_PORT=3306
-```
-
-**3. Migrate & create superuser**
-
-```bash
-python manage.py makemigrations
 python manage.py migrate
 python manage.py createsuperuser
 ```
 
-**4. Verify API**
+### 3.2 Verify core endpoints
 
+```bash
+curl http://localhost:8000/api/customers/customers/
+curl http://localhost:8000/swagger/
 ```
-curl http://localhost:8000/api/customers/
-```
+
+✔ Swagger available
+✔ API reachable
 
 ---
 
-## **Step 4 — Frontend Setup**
-
-**1. Install dependencies**
+## 4️⃣ Frontend Setup
 
 ```bash
 cd frontend
 npm install
-```
-
-**2. Start dev server**
-
-```bash
 npm run dev
 ```
 
-Visit: `http://localhost:5173/`
+Visit:
+👉 `http://localhost:5173`
 
 ---
 
-## **Step 5 — Test Core Workflows**
+## 5️⃣ Core Workflow Validation
 
-### **5.1 Distribution**
+### 5.1 Authentication
+
+1. Login via `/login`
+2. JWT stored in `localStorage`
+3. Protected routes load via RR7 loader
+
+✔ Frontend guarded
+✔ Backend authoritative
+
+---
+
+### 5.2 Distribution (Stock Movement)
 
 1. Go to `/distribution`
-2. Select Depot, Equipment, Quantity, Status → Submit
-3. Verify inventory decreases/increases **only via backend service**
+2. Submit:
 
-### **5.2 Transactions**
+   * depot
+   * equipment_name
+   * quantity
+   * status (`COLLECTION` / `EMPTY_RETURN`)
+3. Backend endpoint hit:
 
-1. Go to `/transaction/:id`
-2. Fill Meter / Cylinder / Service sections
-3. Submit → Transaction record created
-4. Check **audit log**: `/audit/`
+```
+POST /api/distribution/distributions/create/
+```
 
-### **5.3 Reports (Admin)**
+4. Verify:
 
-1. Visit `/reports`
-2. Filter by date / customer
-3. Export → Verify totals match transaction table
+   * Inventory adjusted atomically
+   * Audit log written
+
+✔ No direct inventory mutation
+✔ Service-enforced invariants
 
 ---
 
-## **Step 6 — Load Test Data**
+### 5.3 Transactions (Billing Core)
 
-We can generate **dummy load** via Python management command.
+1. Go to `/transaction`
+2. Enter:
 
-**backend/load_test_data.py**
+   * Meter readings
+   * Cylinder quantities
+   * Service items
+3. Submit → backend command:
+
+```
+POST /api/transactions/transactions/create/
+```
+
+4. Verify:
+
+   * Transaction committed
+   * Meter reading updated
+   * Audit entry written
+   * Invoice eligible for issuance
+
+✔ Meter-safe
+✔ Snapshot pricing
+✔ No frontend authority
+
+---
+
+### 5.4 Invoice Issuance
+
+```
+POST /api/transactions/{transaction_no}/issue-invoice/
+GET  /api/invoices/{invoice_no}/
+```
+
+Verify:
+
+* Sequential invoice numbers
+* GST preserved
+* Immutable totals
+
+---
+
+## 6️⃣ Seed & Load Test Data
+
+### 6.1 Seed script (one-time)
+
+**backend/scripts/seed_data.py**
 
 ```python
-import os, django, random
 from customers.models import Customer
 from depots.models import Depot
 from inventory.models import Inventory
-from django.contrib.auth import get_user_model
+import random
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-django.setup()
-
-User = get_user_model()
-
-# Create depots
 for i in range(3):
-    Depot.objects.get_or_create(code=f"DPT{i+1}", defaults={'name': f"Depot {i+1}"})
+    depot, _ = Depot.objects.get_or_create(code=f"DPT{i+1}", name=f"Depot {i+1}")
+    for eq in ["9kg", "12.7kg", "14kg", "50kg_pol", "50kg_l"]:
+        Inventory.objects.get_or_create(
+            depot=depot,
+            equipment_name=eq,
+            defaults={"quantity": 200}
+        )
 
-# Create inventory
-for depot in Depot.objects.all():
-    for eq in ["Cylinder 9kg", "Cylinder 12.7kg", "Meter"]:
-        Inventory.objects.get_or_create(depot=depot, equipment_name=eq, defaults={'quantity': 100})
-
-# Create customers
 for i in range(20):
-    Customer.objects.get_or_create(name=f"Customer {i+1}", address=f"Address {i+1}", payment_type=random.choice(["CASH","CREDIT"]))
+    Customer.objects.get_or_create(
+        name=f"Customer {i+1}",
+        address="Test Address",
+        payment_type=random.choice(["CASH", "CREDIT"])
+    )
 ```
 
 Run:
 
 ```bash
-python load_test_data.py
+python manage.py shell < scripts/seed_data.py
 ```
 
 ---
 
-## **Step 7 — Load Testing Transactions**
-
-**1. Python script for bulk transactions**
+## 7️⃣ Transaction Load Test
 
 ```python
 import requests, random
 
-API = "http://localhost:8000/api/transactions/create_tx/"
-CUSTOMER_IDS = list(range(1, 21))
-USER_ID = 1  # Superuser or sales user
+API = "http://localhost:8000/api/transactions/transactions/create/"
+TOKEN = "JWT_TOKEN_HERE"
+
+headers = {"Authorization": f"Bearer {TOKEN}"}
 
 for i in range(50):
-    customer = random.choice(CUSTOMER_IDS)
     payload = {
-        "customer": customer,
-        "user": USER_ID,
-        "total_amount": random.randint(50,500),
-        "is_paid": random.choice([True,False])
+        "customer": random.randint(1,20),
+        "total_amount": random.randint(100,500)
     }
-    r = requests.post(API, json=payload)
-    print(r.status_code, r.json())
+    r = requests.post(API, json=payload, headers=headers)
+    print(r.status_code)
 ```
 
-**2. Validate**
+Verify:
 
-* Check `/transactions/` → 50 new transactions
-* Check `/audit/` → all logged
+* Transactions created
+* Audit log populated
+* No partial commits
 
 ---
 
-## **Step 8 — Offline Queue Simulation**
+## 8️⃣ Offline Queue Simulation
 
-1. Go offline in browser
-2. Submit forms → queued in **localStorage**:
+1. Disconnect network
+2. Submit transaction or distribution
+3. Confirm saved to `localStorage`
+4. Reconnect → auto flush
 
-```js
-localStorage.setItem("offlineQueue", JSON.stringify([{ action: "distribution", depot:1, quantity:5 }]));
+✔ Backend rejects invalid state
+✔ No silent data loss
+
+---
+
+## 9️⃣ Audit Integrity Verification
+
+Visit:
+
+```
+GET /api/audit/audit-logs/
 ```
 
-3. Reconnect → flush queue to backend via loader/action
+Confirm:
 
-✔ Backend validation ensures **inventory safety**
-
----
-
-## **Step 9 — Audit Verification**
-
-1. Visit `/audit/`
-2. Verify:
-
-* Timestamp server-generated
-* User attribution present
-* Immutable records (try to delete → fail)
+* Append-only
+* Server timestamps
+* User attribution
+* No delete/edit routes
 
 ---
 
-## **Step 10 — Print / Export Test**
+## 🔟 Reports & Print Validation
 
-1. Go to `/reports`
-2. Export CSV → Compare totals with `/transactions/` table
-3. Verify print-friendly layout
+Endpoints:
 
----
+```
+GET /api/reports/sales/?from=&to=
+GET /api/reports/inventory/?depot=
+```
 
-## ✅ **Lab Completion Checklist**
+Validate:
 
-* [ ] Backend migrated & seeded
-* [ ] Frontend connected & routes working
-* [ ] Distribution & Transactions workflow tested
-* [ ] Load test scripts executed successfully
-* [ ] Offline queue simulation tested
-* [ ] Audit logs verified for integrity
-* [ ] Reports printed & exported successfully
-* [ ] Docker Compose full stack validated
+* Totals match transactions
+* Print CSS applies cleanly
+* CSV/PDF export consistent
 
 ---
 
-This completes a **full-stack, enterprise-grade lab for HSH Sales System**.
+## ✅ FINAL LAB CHECKLIST
 
+* [ ] Docker stack running
+* [ ] Swagger reachable
+* [ ] JWT auth enforced
+* [ ] Distribution inventory-safe
+* [ ] Transactions meter-safe
+* [ ] Invoices GST-correct
+* [ ] Offline queue tested
+* [ ] Audit immutable
+* [ ] Reports reconcile totals
+
+---
+
+## 🎯 Result
+
+You now have a **fully validated, regulator-ready full-stack LPG sales system** with:
+
+* Explicit command boundaries
+* Structural safety (not conventions)
+* Offline tolerance
+* Audit-grade traceability
+* Frontend & backend in strict alignment
 

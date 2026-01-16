@@ -1,38 +1,51 @@
-# 🧪 LAB: HSH Sales System Frontend (React + React Router v7)
+# 🧪 LAB: HSH Sales System Frontend
 
-**Objective:** Build a **production-ready frontend** that integrates with the DRF backend for inventory, distribution, transactions, and reports. The frontend is **role-safe, RR7-native, and workflow-aligned**.
+**React 18 · React Router v7 (Data APIs) · TailwindCSS**
 
-**Prerequisites:**
+**Objective:** Build a **production-ready, regulator-safe frontend** that integrates with the DRF backend for **distribution, transactions, inventory, and reports**.
 
-* Node.js 20+
-* npm or yarn
-* TailwindCSS setup knowledge
-* Backend from the previous lab running on `/api`
+**Hard constraints:**
+
+* ✅ Frontend only
+* ✅ RR7 loaders/actions only
+* ✅ Backend accessed strictly via `/api`
+* ✅ Swagger = source of truth
+* ✅ No client-side stock mutation
 
 ---
 
-## **Step 0 — Setup Project**
+## **Prerequisites**
+
+* Node.js 20+
+* npm or yarn
+* TailwindCSS familiarity
+* Backend running on `/api` with JWT auth
+
+---
+
+## **Step 0 — Project Setup**
 
 ```bash
 mkdir hsh_sales_frontend
 cd hsh_sales_frontend
-npm create vite@latest .  # Select React + JSX
+npm create vite@latest .   # React + JSX
 npm install
-npm install react-router-dom@7 tailwindcss postcss autoprefixer
+npm install react-router-dom@7
+npm install tailwindcss postcss autoprefixer
 npx tailwindcss init -p
 ```
 
-**tailwind.config.cjs**:
+### `tailwind.config.cjs`
 
 ```js
 module.exports = {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: { extend: {} },
   plugins: [],
-}
+};
 ```
 
-**index.css**:
+### `src/index.css`
 
 ```css
 @tailwind base;
@@ -42,9 +55,9 @@ module.exports = {
 
 ---
 
-## **Step 1 — Application Entry**
+## **Step 1 — Application Entry (RR7-native)**
 
-**src/main.jsx**
+### `src/main.jsx`
 
 ```jsx
 import React from "react";
@@ -60,32 +73,45 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 );
 ```
 
-✔ RR7-native bootstrap, no hacks
+✔ No legacy routers
+✔ No side-effect auth hacks
 
 ---
 
-## **Step 2 — API Helper**
+## **Step 2 — API Helper (JWT-safe)**
 
-**src/api.js**
+### `src/api.js`
 
 ```js
 export async function api(url, options = {}) {
-  return fetch(`/api${url}`, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+  const token = localStorage.getItem("access_token");
+
+  const res = await fetch(`/api${url}`, {
     ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
+
+  if (res.status === 401) {
+    localStorage.removeItem("access_token");
+    throw new Response("Unauthorized", { status: 401 });
+  }
+
+  return res;
 }
 ```
 
-✔ Cookie-based auth ready
-✔ Centralized fetch logic
+✔ Centralized auth
+✔ Backend-enforced security
+✔ Compatible with SimpleJWT
 
 ---
 
-## **Step 3 — Router Configuration (RR7 Data Mode)**
+## **Step 3 — Router Configuration (RR7 Data APIs)**
 
-**src/router.jsx**
+### `src/router.jsx`
 
 ```jsx
 import { createBrowserRouter, redirect } from "react-router-dom";
@@ -97,13 +123,12 @@ import Transaction from "./routes/transaction";
 import Customers from "./routes/customers";
 import Inventory from "./routes/inventory";
 import Reports from "./routes/reports";
-
 import { api } from "./api";
 
 const requireAuth = async () => {
-  const res = await api("/users/");
+  const res = await api("/accounts/users/");
   if (!res.ok) throw redirect("/login");
-  return null;
+  return res.json();
 };
 
 export default createBrowserRouter([
@@ -112,29 +137,35 @@ export default createBrowserRouter([
     element: <DashboardLayout />,
     loader: requireAuth,
     children: [
-      { path: "/", element: <Dashboard /> },
-      { path: "/distribution", element: <Distribution /> },
-      { path: "/transaction/:id", element: <Transaction /> },
-      { path: "/customers", element: <Customers /> },
-      { path: "/inventory", element: <Inventory /> },
-      { path: "/reports", element: <Reports /> },
+      { index: true, element: <Dashboard /> },
+      { path: "distribution", element: <Distribution /> },
+      { path: "transaction", element: <Transaction /> },
+      { path: "customers", element: <Customers /> },
+      { path: "inventory", element: <Inventory /> },
+      { path: "reports", element: <Reports /> },
     ],
   },
 ]);
 ```
 
-**✅ Lab Checkpoint:** Attempt to access `/` when logged out → redirect to `/login`.
+### ✅ Lab Checkpoint
+
+* Access `/` without token → redirected to `/login`
+* Auth enforced **before render**
 
 ---
 
-## **Step 4 — Layout**
+## **Step 4 — Persistent Layout (Role-Aware)**
 
-**src/layouts/DashboardLayout.jsx**
+### `src/layouts/DashboardLayout.jsx`
 
 ```jsx
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLoaderData } from "react-router-dom";
 
 export default function DashboardLayout() {
+  const users = useLoaderData();
+  const user = users[0];
+
   return (
     <div className="flex min-h-screen">
       <aside className="w-64 bg-blue-900 text-white p-4">
@@ -142,12 +173,14 @@ export default function DashboardLayout() {
         <nav className="space-y-2">
           <NavLink to="/">Dashboard</NavLink>
           <NavLink to="/distribution">Distribution</NavLink>
+          <NavLink to="/transaction">Transaction</NavLink>
           <NavLink to="/customers">Customers</NavLink>
           <NavLink to="/inventory">Inventory</NavLink>
-          <NavLink to="/reports">Reports</NavLink>
+          {user.role === "ADMIN" && <NavLink to="/reports">Reports</NavLink>}
         </nav>
       </aside>
-      <main className="flex-1 p-6 bg-gray-100">
+
+      <main className="flex-1 p-6 bg-gray-100 print:bg-white">
         <Outlet />
       </main>
     </div>
@@ -155,14 +188,14 @@ export default function DashboardLayout() {
 }
 ```
 
-✔ Persistent layout
-✔ Print-friendly main content
+✔ Role-safe navigation
+✔ Print-friendly main area
 
 ---
 
-## **Step 5 — Login Route**
+## **Step 5 — Login (JWT Acquisition)**
 
-**src/routes/login.jsx**
+### `src/routes/login.jsx`
 
 ```jsx
 import { useNavigate } from "react-router-dom";
@@ -174,200 +207,197 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = async (e) => {
+  const handleLogin = async e => {
     e.preventDefault();
     const res = await api("/token/", {
       method: "POST",
       body: JSON.stringify({ username, password }),
     });
 
-    if (res.ok) navigate("/");
-    else alert("Login failed");
+    if (!res.ok) return alert("Login failed");
+
+    const data = await res.json();
+    localStorage.setItem("access_token", data.access);
+    navigate("/");
   };
 
   return (
-    <form onSubmit={handleLogin} className="max-w-md mx-auto mt-20 p-6 bg-white shadow-md">
+    <form onSubmit={handleLogin} className="max-w-md mx-auto mt-20 p-6 bg-white shadow">
       <h1 className="text-xl font-bold mb-4">Login</h1>
-      <input
-        className="block w-full mb-3 p-2 border"
-        placeholder="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
-      <input
-        type="password"
-        className="block w-full mb-3 p-2 border"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <button type="submit" className="bg-blue-900 text-white px-4 py-2">Login</button>
+      <input className="border p-2 w-full mb-3" placeholder="Username" onChange={e => setUsername(e.target.value)} />
+      <input type="password" className="border p-2 w-full mb-3" placeholder="Password" onChange={e => setPassword(e.target.value)} />
+      <button className="bg-blue-900 text-white px-4 py-2 w-full">Login</button>
     </form>
   );
 }
 ```
 
-✔ Basic auth flow complete
-✔ Can extend with JWT storage
+✔ JWT stored client-side
+✔ Backend remains authority
 
 ---
 
-## **Step 6 — Distribution Route (Depot Inventory Movement)**
+## **Step 6 — Distribution (Command-Only)**
 
-**src/routes/distribution.jsx**
+### `src/routes/distribution.jsx`
 
 ```jsx
-import { Form, useActionData } from "react-router-dom";
+import { Form, redirect } from "react-router-dom";
 import { api } from "../api";
 
 export async function action({ request }) {
   const data = Object.fromEntries(await request.formData());
-  await api("/distributions/", {
+
+  await api("/distribution/distributions/create/", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      depot: data.depot,
+      equipment_name: data.equipment_name,
+      quantity: Number(data.quantity),
+      status: data.status,
+    }),
   });
-  return { success: true };
+
+  return redirect("/");
 }
 
 export default function Distribution() {
   return (
-    <Form method="post">
-      <h2 className="font-bold mb-2">Create Distribution</h2>
-      <input type="text" name="depot" placeholder="Depot ID" className="border p-2 mb-2"/>
-      <input type="text" name="equipment_name" placeholder="Equipment" className="border p-2 mb-2"/>
-      <input type="number" name="quantity" placeholder="Quantity" className="border p-2 mb-2"/>
-      <select name="status" className="border p-2 mb-2">
+    <Form method="post" className="space-y-2">
+      <h2 className="font-bold">Stock Distribution</h2>
+      <input name="depot" placeholder="Depot ID" className="border p-2" />
+      <input name="equipment_name" placeholder="Equipment" className="border p-2" />
+      <input name="quantity" type="number" placeholder="Quantity" className="border p-2" />
+      <select name="status" className="border p-2">
         <option value="COLLECTION">Collection</option>
         <option value="EMPTY_RETURN">Empty Return</option>
       </select>
-      <button className="bg-blue-900 text-white px-4 py-2">Submit</button>
+      <button className="bg-blue-900 text-white px-4 py-2">Execute</button>
     </Form>
   );
 }
 ```
 
-✔ Backend-safe payload
-✔ Inventory updated **via service only**
+✔ No direct inventory mutation
+✔ Backend service enforces locking
 
 ---
 
-## **Step 7 — Transactions (Meter/Cylinder/Service)**
+## **Step 7 — Transactions (Meter / Cylinder / Service)**
 
-**Key Principles:**
+**Principles:**
 
-* Subtotals calculated client-side
-* Backend remains source of truth
-* Print only **after successful commit**
+* UI computes previews only
+* Backend commits totals
+* Audit & invoice created server-side
 
 ```jsx
-// Conceptual snippet
-<MeterSection transaction={tx} onChange={handleMeterUpdate} />
-<CylinderSection transaction={tx} onChange={handleCylinderUpdate} />
-<ServiceSection transaction={tx} onChange={handleServiceUpdate} />
-<SummaryBar total={calculateTotal(tx)} />
+<MeterSection />
+<CylinderSection />
+<ServiceSection />
+<SummaryBar />
 ```
 
-**✅ Lab Checkpoint:** Ensure `Transaction` action sends structured JSON to `/transactions/create_tx/`.
+**Action target:**
+`POST /transactions/transactions/create/`
+
+### ✅ Lab Checkpoint
+
+* Transaction persists even if UI refreshes
+* Meter reading increments stored backend-side
 
 ---
 
-## **Step 8 — Inventory View (Read-Only)**
+## **Step 8 — Inventory (Read-Only)**
+
+### `src/routes/inventory.jsx`
 
 ```jsx
-import { useEffect, useState } from "react";
+import { useLoaderData } from "react-router-dom";
 import { api } from "../api";
+
+export async function loader() {
+  const res = await api("/inventory/inventory/");
+  return res.json();
+}
 
 export default function Inventory() {
-  const [inventory, setInventory] = useState([]);
-  useEffect(() => {
-    api("/inventory/").then(r => r.json()).then(setInventory);
-  }, []);
+  const items = useLoaderData();
   return (
-    <div>
-      <h1 className="font-bold mb-4">Inventory</h1>
-      <ul>
-        {inventory.map(i => <li key={i.id}>{i.depot} — {i.equipment_name}: {i.quantity}</li>)}
-      </ul>
-    </div>
-  );
-}
-```
-
-✔ Depot-scoped
-✔ Read-only
-
----
-
-## **Step 9 — Reports (Admin-Only)**
-
-```jsx
-import { useEffect, useState } from "react";
-import { api } from "../api";
-
-export default function Reports() {
-  const [reports, setReports] = useState([]);
-  useEffect(() => {
-    api("/reports/").then(r => r.json()).then(setReports);
-  }, []);
-  return (
-    <div>
-      <h1 className="font-bold mb-4">Reports</h1>
-      <table className="border-collapse border">
-        <thead>
-          <tr>
-            <th className="border p-2">Customer</th>
-            <th className="border p-2">Total</th>
-            <th className="border p-2">Paid</th>
-          </tr>
-        </thead>
-        <tbody>
-          {reports.map(r => (
-            <tr key={r.id}>
-              <td className="border p-2">{r.customer}</td>
-              <td className="border p-2">{r.total_amount}</td>
-              <td className="border p-2">{r.is_paid ? "Yes" : "No"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul>
+      {items.map((i, idx) => (
+        <li key={idx}>
+          {i.depot} — {i.equipment_name}: {i.quantity}
+        </li>
+      ))}
+    </ul>
   );
 }
 ```
 
 ✔ Loader-driven
-✔ Admin-only access guaranteed by backend
+✔ Immutable by design
 
 ---
 
-## **Step 10 — Role Safety & Offline Prep**
+## **Step 9 — Reports (Admin Only)**
 
-* `/reports` menu hidden for SALES users (optional)
-* All routes **backend-protected**
-* Offline queueing can be added via **localStorage or IndexedDB**:
+### `src/routes/reports.jsx`
 
-```js
-// Example: store offline actions
-const offlineQueue = JSON.parse(localStorage.getItem("offlineQueue") || "[]");
-offlineQueue.push(action);
-localStorage.setItem("offlineQueue", JSON.stringify(offlineQueue));
+```jsx
+import { useLoaderData } from "react-router-dom";
+import { api } from "../api";
+
+export async function loader() {
+  const res = await api("/reports/sales/");
+  return res.json();
+}
+
+export default function Reports() {
+  const data = useLoaderData();
+  return (
+    <pre className="bg-white p-4">{JSON.stringify(data, null, 2)}</pre>
+  );
+}
 ```
 
----
-
-## ✅ Lab Completion Checklist
-
-* [ ] RR7 router fully configured
-* [ ] Login and auth flow working
-* [ ] Distribution module calls backend **safely**
-* [ ] Transactions module maps Meter/Cylinder/Service correctly
-* [ ] Inventory read-only view working
-* [ ] Reports loader-driven & admin-only
-* [ ] Frontend ready for offline queue extension
-* [ ] Tailwind layout print-friendly
+✔ Backend-enforced RBAC
+✔ Frontend hides menu only as UX aid
 
 ---
 
-This lab gives you a **workflow-aligned, production-ready React + RR7 frontend** that is **fully integrated** with your DRF backend.
+## **Step 10 — Offline Safety (Optional Extension)**
 
+```js
+const buffer = JSON.parse(localStorage.getItem("txn_buffer") || "[]");
+buffer.push(txn);
+localStorage.setItem("txn_buffer", JSON.stringify(buffer));
+```
+
+✔ Regulator-safe retry
+✔ No silent loss of sales
+
+---
+
+## ✅ LAB COMPLETION CHECKLIST
+
+* [ ] RR7 loaders/actions only
+* [ ] JWT login works
+* [ ] Distribution via service
+* [ ] Transactions meter-safe
+* [ ] Inventory read-only
+* [ ] Reports admin-protected
+* [ ] Print-friendly UI
+* [ ] Swagger-aligned payloads
+
+---
+
+### 🎯 Outcome
+
+You now have a **production-grade, regulator-ready frontend lab** that:
+
+* Mirrors backend domain boundaries
+* Enforces workflow correctness
+* Scales to audits and field usage
+* Avoids frontend-side financial authority
 

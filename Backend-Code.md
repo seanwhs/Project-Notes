@@ -1,89 +1,154 @@
-# 🔐 BACKEND — Code 
+# 🔐 BACKEND — FULL SOURCE CODE (DJANGO + DRF)
 
-**Purpose**: Production-grade backend for **regulated LPG operations** — not a CRUD demo.
+> Assumptions
 
----
-
-## ✅ Architectural Characteristics
-
-* Domain-Driven
-* Service-Oriented
-* Inventory-Safe
-* Meter-Safe
-* Audit-Safe
-* Report-Ready
-
-**Design stance**: Business invariants are enforced structurally, not by convention.
+* Django 4.x
+* Django REST Framework
+* PostgreSQL
+* Single monorepo `backend/`
+* Custom User model
+* Service-layer enforcement
 
 ---
 
-## 📦 App Structure
+## 📦 PROJECT STRUCTURE (REAL FILES)
 
 ```
 backend/
-├── accounts/        # Identity & roles
-├── customers/       # Contracts & billing rules
-├── depots/          # Physical stock locations
-├── inventory/       # Depot-scoped quantities (read-only)
-├── distribution/    # Physical stock movement (commands)
-├── transactions/    # Billing & sales logic
-├── audit/           # Immutable activity log
-├── reports/         # Read-only finance views
+├── manage.py
 ├── config/
-│   └── urls.py
+│   ├── __init__.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+│
+├── accounts/
+├── customers/
+├── depots/
+├── inventory/
+├── distribution/
+├── transactions/
+├── invoices/
+├── audit/
+├── reports/
 ```
 
 ---
 
-# 1️⃣ ACCOUNTS — Identity & Authorization
+# 🔐 ACCOUNTS — Identity & Authorization
 
-### Model
+## `accounts/models.py`
 
 ```python
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
 class User(AbstractUser):
+    ROLE_ADMIN = 'ADMIN'
+    ROLE_SALES = 'SALES'
+
     ROLE_CHOICES = (
-        ('ADMIN', 'Admin'),
-        ('SALES', 'Sales'),
+        (ROLE_ADMIN, 'Admin'),
+        (ROLE_SALES, 'Sales'),
     )
 
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
-    vehicle_no = models.CharField(max_length=20, blank=True, null=True)
+    vehicle_no = models.CharField(max_length=20, null=True, blank=True)
+
+    def is_admin(self):
+        return self.role == self.ROLE_ADMIN
 ```
-
-**Invariants**
-
-* Roles are explicit (no permission-string ambiguity)
-* Vehicle assignment is optional but traceable
-
-### Access Control
-
-```python
-class IsAdmin(BasePermission):
-    def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == 'ADMIN'
-```
-
-### URLs
-
-```
-GET/POST/PATCH/DELETE  /api/accounts/users/
-```
-
-Admin-only. No privilege escalation paths.
 
 ---
 
-# 2️⃣ CUSTOMERS — Contracts & Rates
-
-### Model
+## `accounts/permissions.py`
 
 ```python
+from rest_framework.permissions import BasePermission
+
+class IsAdmin(BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role == 'ADMIN'
+        )
+```
+
+---
+
+## `accounts/serializers.py`
+
+```python
+from rest_framework import serializers
+from .models import User
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            'id', 'username', 'password',
+            'role', 'vehicle_no',
+            'is_active'
+        )
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = User.objects.create_user(**validated_data)
+        return user
+```
+
+---
+
+## `accounts/views.py`
+
+```python
+from rest_framework.viewsets import ModelViewSet
+from .models import User
+from .serializers import UserSerializer
+from .permissions import IsAdmin
+
+class UserViewSet(ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAdmin]
+```
+
+---
+
+## `accounts/urls.py`
+
+```python
+from rest_framework.routers import DefaultRouter
+from .views import UserViewSet
+
+router = DefaultRouter()
+router.register('users', UserViewSet, basename='users')
+
+urlpatterns = router.urls
+```
+
+---
+
+# 👥 CUSTOMERS — Contracts & Rates
+
+## `customers/models.py`
+
+```python
+from django.db import models
+
 class Customer(models.Model):
-    PAYMENT = [('CASH', 'Cash'), ('CREDIT', 'Credit')]
+    CASH = 'CASH'
+    CREDIT = 'CREDIT'
+
+    PAYMENT_CHOICES = (
+        (CASH, 'Cash'),
+        (CREDIT, 'Credit'),
+    )
 
     name = models.CharField(max_length=255)
     address = models.TextField()
-    payment_type = models.CharField(max_length=10, choices=PAYMENT)
+    payment_type = models.CharField(max_length=10, choices=PAYMENT_CHOICES)
 
     meter_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     rate_9kg = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -93,33 +158,78 @@ class Customer(models.Model):
     rate_50kg_l = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     last_meter_reading = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-```
 
-**Invariant**
-
-> Rates are historical truth at point-of-sale. Never recomputed retroactively.
-
-### URLs
-
-```
-GET/POST/PATCH  /api/customers/customers/
+    def __str__(self):
+        return self.name
 ```
 
 ---
 
-# 3️⃣ DEPOTS & INVENTORY — Physical Reality
-
-### Depot
+## `customers/views.py`
 
 ```python
+from rest_framework.viewsets import ModelViewSet
+from .models import Customer
+from .serializers import CustomerSerializer
+
+class CustomerViewSet(ModelViewSet):
+    queryset = Customer.objects.all()
+    serializer_class = CustomerSerializer
+```
+
+---
+
+## `customers/serializers.py`
+
+```python
+from rest_framework import serializers
+from .models import Customer
+
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = '__all__'
+```
+
+---
+
+## `customers/urls.py`
+
+```python
+from rest_framework.routers import DefaultRouter
+from .views import CustomerViewSet
+
+router = DefaultRouter()
+router.register('customers', CustomerViewSet)
+
+urlpatterns = router.urls
+```
+
+---
+
+# 🏭 DEPOTS & INVENTORY — Physical Reality
+
+## `depots/models.py`
+
+```python
+from django.db import models
+
 class Depot(models.Model):
     code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.code
 ```
 
-### Inventory (Read-Only)
+---
+
+## `inventory/models.py`
 
 ```python
+from django.db import models
+from depots.models import Depot
+
 class Inventory(models.Model):
     depot = models.ForeignKey(Depot, on_delete=models.CASCADE)
     equipment_name = models.CharField(max_length=50)
@@ -129,62 +239,125 @@ class Inventory(models.Model):
         unique_together = ('depot', 'equipment_name')
 ```
 
-**Invariants**
+---
 
-* Always depot-scoped
-* No global stock illusion
-* No direct writes
+## `inventory/views.py`
 
-### URLs
+```python
+from rest_framework.generics import ListAPIView
+from .models import Inventory
+from .serializers import InventorySerializer
 
+class InventoryListView(ListAPIView):
+    queryset = Inventory.objects.all()
+    serializer_class = InventorySerializer
 ```
-GET  /api/inventory/inventory/
-```
-
-All mutations flow through services only.
 
 ---
 
-# 4️⃣ DISTRIBUTION — Stock Movement (Commands)
-
-### Model
+## `inventory/urls.py`
 
 ```python
+from django.urls import path
+from .views import InventoryListView
+
+urlpatterns = [
+    path('inventory/', InventoryListView.as_view()),
+]
+```
+
+---
+
+# 🚚 DISTRIBUTION — Stock Movement (COMMANDS)
+
+## `distribution/models.py`
+
+```python
+from django.db import models
+from accounts.models import User
+from depots.models import Depot
+
 class Distribution(models.Model):
-    STATUS = [('COLLECTION', 'Collection'), ('EMPTY_RETURN', 'Empty Return')]
+    COLLECTION = 'COLLECTION'
+    EMPTY_RETURN = 'EMPTY_RETURN'
+
+    STATUS_CHOICES = (
+        (COLLECTION, 'Collection'),
+        (EMPTY_RETURN, 'Empty Return'),
+    )
 
     distribution_no = models.CharField(max_length=30, unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     depot = models.ForeignKey(Depot, on_delete=models.CASCADE)
     equipment_name = models.CharField(max_length=50)
     quantity = models.PositiveIntegerField()
-    status = models.CharField(max_length=20, choices=STATUS)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
 ```
 
-### Service (Atomic)
+---
 
-* Adjusts inventory
-* Creates distribution record
-* Writes audit log
+## `distribution/services.py`
 
-**Invariant**: No distribution without inventory mutation.
+```python
+from django.db import transaction
+from inventory.models import Inventory
+from .models import Distribution
+from audit.services import AuditService
 
-### URL
+class DistributionService:
 
+    @staticmethod
+    @transaction.atomic
+    def create(**data):
+        inventory = Inventory.objects.select_for_update().get(
+            depot=data['depot'],
+            equipment_name=data['equipment_name']
+        )
+
+        if inventory.quantity < data['quantity']:
+            raise ValueError("Insufficient stock")
+
+        inventory.quantity -= data['quantity']
+        inventory.save()
+
+        dist = Distribution.objects.create(**data)
+
+        AuditService.log(
+            data['user'],
+            f"Distribution {dist.distribution_no} created"
+        )
+
+        return dist
 ```
-POST  /api/distribution/distributions/create/
-```
-
-Command-style endpoint (intentionally not CRUD).
 
 ---
 
-# 5️⃣ TRANSACTIONS — Billing Core
-
-### Transaction
+## `distribution/views.py`
 
 ```python
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .services import DistributionService
+
+class DistributionCreateView(APIView):
+    def post(self, request):
+        dist = DistributionService.create(**request.data)
+        return Response({'id': dist.id}, status=status.HTTP_201_CREATED)
+```
+
+---
+
+# 💰 TRANSACTIONS — Billing Core
+
+## `transactions/models.py`
+
+```python
+from django.db import models
+from customers.models import Customer
+from accounts.models import User
+
 class Transaction(models.Model):
     transaction_no = models.CharField(max_length=50, unique=True)
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
@@ -194,250 +367,161 @@ class Transaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 ```
 
-### Meter Sale
+---
+
+## `transactions/services.py`
 
 ```python
-class MeterSale(models.Model):
-    transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
-    last_reading = models.DecimalField(max_digits=10, decimal_places=2)
-    latest_reading = models.DecimalField(max_digits=10, decimal_places=2)
-    quantity = models.DecimalField(max_digits=10, decimal_places=2)
-    rate = models.DecimalField(max_digits=10, decimal_places=2)
-    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
-```
+from django.db import transaction
+from .models import Transaction
+from audit.services import AuditService
 
-(CylinderSale & ServiceSale unchanged.)
+class TransactionService:
 
-**Critical Invariant**
-
-> Meter readings update only after successful transaction commit.
-
-### URLs
-
-```
-POST /api/transactions/transactions/create/
-GET  /api/transactions/transactions/{transaction_no}/
+    @staticmethod
+    @transaction.atomic
+    def create(**data):
+        tx = Transaction.objects.create(**data)
+        AuditService.log(data['user'], f"Transaction {tx.transaction_no}")
+        return tx
 ```
 
 ---
 
-# 6️⃣ AUDIT — Immutable Truth
+# 🧾 INVOICES & GST — REGULATED BILLING
 
-**Properties**
-
-* Append-only
-* Never edited
-* Never deleted
-
-### URL
-
-```
-GET  /api/audit/audit-logs/
-```
-
-Admin-only. Forensics-ready.
-
----
-
-# 7️⃣ REPORTS — Finance & Control
-
-**Characteristics**
-
-* Read-only
-* Flat payloads
-* URL-driven filters
-* Export-ready
-
-### URLs
-
-```
-GET /api/reports/sales/?from=&to=
-GET /api/reports/inventory/?depot=
-```
-
-RR7 loader-compatible by design.
-
----
-
-# 🌐 ROOT ROUTING
+## `invoices/models.py`
 
 ```python
-urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/accounts/', include('accounts.urls')),
-    path('api/customers/', include('customers.urls')),
-    path('api/depots/', include('depots.urls')),
-    path('api/inventory/', include('inventory.urls')),
-    path('api/distribution/', include('distribution.urls')),
-    path('api/transactions/', include('transactions.urls')),
-    path('api/audit/', include('audit.urls')),
-    path('api/reports/', include('reports.urls')),
-]
-```
+from django.db import models
+from transactions.models import Transaction
 
----
-
-## ✅ Final Result
-
-* URLs express **intent**, not tables
-* Commands never masquerade as CRUD
-* Inventory & meters are structurally protected
-* Audit coverage is automatic
-* Regulators can trace every state change
-
----
-
-**Next optional hardening**
-
-* JWT + refresh rotation
-* Idempotency keys (mobile sales)
-* RR7 loader ↔ action mapping
-
----
-
-# 🧾 GST & INVOICE NUMBERING — REGULATED BILLING EXTENSION
-
-This section formalizes **tax correctness** and **invoice traceability**, suitable for Singapore-style GST regimes and regulated LPG billing.
-
----
-
-## 1️⃣ Invoice Numbering — Immutable & Sequential
-
-### Design Rules
-
-* Invoice numbers are **system-generated**
-* Never reused, never edited, never deleted
-* Sequence is **monotonic**, not guessable
-* Gap-tolerant (failed transactions do not corrupt sequence)
-
-### Model
-
-```python
 class Invoice(models.Model):
     invoice_no = models.CharField(max_length=30, unique=True)
     transaction = models.OneToOneField(Transaction, on_delete=models.PROTECT)
     issued_at = models.DateTimeField(auto_now_add=True)
 
-    # Monetary breakdown
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     gst_amount = models.DecimalField(max_digits=10, decimal_places=2)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
 ```
 
-**Invariant**
-
-> An invoice may exist only for a successfully committed transaction.
-
 ---
 
-## 2️⃣ GST Calculation — Explicit & Auditable
-
-### GST Rules
-
-* GST rate is **explicitly stored** at invoice time
-* Never inferred later
-* Never recomputed retroactively
+## `invoices/services.py`
 
 ```python
-GST_RATE = Decimal('0.09')  # example: 9%
+from decimal import Decimal
+from django.utils import timezone
+from django.db import transaction
+from .models import Invoice
+from audit.services import AuditService
 
-gst_amount = subtotal * GST_RATE
-total_amount = subtotal + gst_amount
-```
+GST_RATE = Decimal('0.09')
 
-**Why this matters**
-
-* Rate changes do not affect historical invoices
-* Auditors can recompute totals exactly
-
----
-
-## 3️⃣ Invoice Issuance Service (Atomic)
-
-```python
 class InvoiceService:
 
     @staticmethod
-    @transaction.atomic
-    def issue(transaction_obj):
-        assert transaction_obj.id
+    def next_invoice_no():
+        prefix = timezone.now().strftime('%Y%m')
+        last = Invoice.objects.filter(invoice_no__contains=prefix).order_by('invoice_no').last()
+        seq = int(last.invoice_no[-5:]) + 1 if last else 1
+        return f"INV-{prefix}-{seq:05d}"
 
-        subtotal = transaction_obj.total_amount
+    @staticmethod
+    @transaction.atomic
+    def issue(tx):
+        subtotal = tx.total_amount
         gst = subtotal * GST_RATE
 
         invoice = Invoice.objects.create(
             invoice_no=InvoiceService.next_invoice_no(),
-            transaction=transaction_obj,
+            transaction=tx,
             subtotal=subtotal,
             gst_amount=gst,
             total_amount=subtotal + gst
         )
 
-        AuditService.log(
-            transaction_obj.user,
-            f"Invoice {invoice.invoice_no} issued"
-        )
-
+        AuditService.log(tx.user, f"Issued invoice {invoice.invoice_no}")
         return invoice
 ```
 
-✔ Atomic
-✔ Idempotent-safe
-✔ Audit-logged
-
 ---
 
-## 4️⃣ Invoice Number Generator
+# 🧾 AUDIT — IMMUTABLE LOG
+
+## `audit/models.py`
 
 ```python
-class InvoiceService:
+from django.db import models
+from accounts.models import User
+
+class AuditLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+```
+
+---
+
+## `audit/services.py`
+
+```python
+from .models import AuditLog
+
+class AuditService:
 
     @staticmethod
-    def next_invoice_no():
-        today = timezone.now().strftime('%Y%m')
-        last = Invoice.objects.filter(invoice_no__startswith=today).order_by('invoice_no').last()
-
-        seq = int(last.invoice_no[-5:]) + 1 if last else 1
-        return f"INV-{today}-{seq:05d}"
-```
-
-**Example**
-
-```
-INV-202601-00001
-INV-202601-00002
+    def log(user, message):
+        AuditLog.objects.create(user=user, message=message)
 ```
 
 ---
 
-## 5️⃣ API Surface
+# 📊 REPORTS — READ ONLY
 
+## `reports/views.py`
+
+```python
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from transactions.models import Transaction
+from inventory.models import Inventory
+
+class SalesReport(APIView):
+    def get(self, request):
+        qs = Transaction.objects.all().values(
+            'transaction_no', 'total_amount', 'created_at'
+        )
+        return Response(list(qs))
+
+class InventoryReport(APIView):
+    def get(self, request):
+        qs = Inventory.objects.all().values(
+            'depot__code', 'equipment_name', 'quantity'
+        )
+        return Response(list(qs))
 ```
-POST /api/transactions/{transaction_no}/issue-invoice/
-GET  /api/invoices/{invoice_no}/
+
+---
+
+# 🌐 ROOT ROUTING
+
+## `config/urls.py`
+
+```python
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/accounts/', include('accounts.urls')),
+    path('api/customers/', include('customers.urls')),
+    path('api/inventory/', include('inventory.urls')),
+    path('api/distribution/', include('distribution.urls')),
+    path('api/transactions/', include('transactions.urls')),
+    path('api/invoices/', include('invoices.urls')),
+    path('api/audit/', include('audit.urls')),
+    path('api/reports/', include('reports.urls')),
+]
 ```
-
-* Issue = command
-* Retrieve = read-only
-
----
-
-## 6️⃣ Compliance Guarantees
-
-✔ Invoice ↔ Transaction is 1:1
-✔ GST rate preserved historically
-✔ Invoice numbers are immutable
-✔ Full audit trail exists
-
----
-
-## 7️⃣ Explicitly Forbidden
-
-* ❌ Editing invoice totals
-* ❌ Deleting invoices
-* ❌ Reissuing invoices with same number
-* ❌ Calculating GST on the frontend
-
----
-
-**Result**: Your billing system is now **tax-correct, regulator-ready, and audit-proof**.

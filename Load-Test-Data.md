@@ -1,171 +1,182 @@
-**Python script** to populate your HSH Sales System database with **realistic test data** for `Users`, `Customers`, `Inventory`, `Transactions`, and `Distributions`. Since your backend uses **Django + MySQL**, we'll use **Django ORM** inside a management command or standalone script.
+# 🧪 HSH Sales System — Test Data Loader
 
-Here’s a **full script**:
+**Purpose:** Populate the database with **realistic test data** for:
+
+* Users
+* Customers
+* Depots
+* Inventory (initial stock only)
+* Distributions (via service)
+* Transactions (safe baseline)
 
 ---
+
+## 📁 Location
+
+```
+backend/scripts/load_test_data.py
+```
+
+---
+
+## ✅ FINAL SCRIPT
 
 ```python
 # scripts/load_test_data.py
 import os
 import django
 import random
-from datetime import datetime, timedelta
+from decimal import Decimal
+from datetime import timedelta
+from django.utils import timezone
 
-# Setup Django environment
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+# --------------------------------------------------
+# Django setup
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
 from django.contrib.auth import get_user_model
-from accounts.models import User  # if you have a custom User model
 from customers.models import Customer
-from inventory.models import InventoryItem
+from depots.models import Depot
+from inventory.models import Inventory
+from distribution.services import create_distribution
 from transactions.models import Transaction
-from distribution.models import Distribution
-from audit.models import AuditLog
 
-# -------------------------------
+User = get_user_model()
+
+# --------------------------------------------------
 # Configuration
 NUM_USERS = 5
 NUM_CUSTOMERS = 20
-NUM_INVENTORY = 10
-NUM_TRANSACTIONS = 50
-NUM_DISTRIBUTIONS = 30
+NUM_TRANSACTIONS = 40
+NUM_DISTRIBUTIONS = 25
 
-# -------------------------------
-# Helper Functions
-def random_username():
-    return f"user_{random.randint(1000,9999)}"
+EQUIPMENT = ["9kg", "12.7kg", "14kg", "50kg_pol", "50kg_l"]
 
-def random_email(username):
-    return f"{username}@example.com"
+# --------------------------------------------------
+# Helpers
+def rand_name():
+    return f"Customer {random.randint(1000,9999)}"
 
-def random_name():
-    first_names = ['Acme','Global','Prime','Star','Horizon','Everest','Summit']
-    last_names = ['Industries','Trading','Logistics','Enterprises','Solutions']
-    return f"{random.choice(first_names)} {random.choice(last_names)}"
+def rand_payment():
+    return random.choice(["CASH", "CREDIT"])
 
-def random_payment_type():
-    return random.choice(['monthly','cash'])
+# --------------------------------------------------
+print("🔧 Creating users...")
 
-def random_equipment():
-    return random.choice(['CYL 14', 'CYL 50', 'REGULATOR', 'HOSE'])
-
-# -------------------------------
-# Create Users
-UserModel = get_user_model()
-print("Creating users...")
-for _ in range(NUM_USERS):
-    username = random_username()
-    user, created = UserModel.objects.get_or_create(
+for i in range(NUM_USERS):
+    username = f"user{i+1}"
+    user, created = User.objects.get_or_create(
         username=username,
         defaults={
-            'email': random_email(username),
-            'role': random.choice(['admin','sales']),
-            'vehicle_no': f"SG{random.randint(1000,9999)}A",
+            "is_staff": i == 0,
+            "is_superuser": i == 0,
         }
     )
     if created:
-        user.set_password('test1234')
+        user.set_password("test1234")
         user.save()
-        print(f"Created user: {username}")
+        print(f"  ✔ {username}")
 
-# -------------------------------
-# Create Customers
-print("Creating customers...")
+# --------------------------------------------------
+print("🏬 Creating depots & inventory...")
+
+for i in range(3):
+    depot, _ = Depot.objects.get_or_create(
+        code=f"DPT{i+1}",
+        defaults={"name": f"Depot {i+1}"}
+    )
+
+    for eq in EQUIPMENT:
+        Inventory.objects.get_or_create(
+            depot=depot,
+            equipment_name=eq,
+            defaults={"quantity": 200}
+        )
+
+print("  ✔ Depots & inventory seeded")
+
+# --------------------------------------------------
+print("👥 Creating customers...")
+
 for _ in range(NUM_CUSTOMERS):
-    name = random_name()
-    customer, _ = Customer.objects.get_or_create(
-        name=name,
+    Customer.objects.get_or_create(
+        name=rand_name(),
         defaults={
-            'payment_type': random_payment_type(),
-            'rate_14kg': random.randint(40, 60),
-            'rate_50kg': random.randint(150, 200),
+            "address": "Test Address",
+            "payment_type": rand_payment(),
         }
     )
-    print(f"Created customer: {name}")
 
-# -------------------------------
-# Create Inventory
-print("Creating inventory items...")
-for _ in range(NUM_INVENTORY):
-    item_name = random_equipment()
-    inventory, _ = InventoryItem.objects.get_or_create(
-        equipment=item_name,
-        depot=f"Depot {random.randint(1,3)}",
-        defaults={
-            'full_qty': random.randint(10,50),
-            'empty_qty': random.randint(5,30),
-        }
+print("  ✔ Customers created")
+
+# --------------------------------------------------
+print("📦 Creating distributions (service-safe)...")
+
+users = list(User.objects.all())
+depots = list(Depot.objects.all())
+
+for _ in range(NUM_DISTRIBUTIONS):
+    create_distribution(
+        user=random.choice(users),
+        depot=random.choice(depots),
+        equipment_name=random.choice(EQUIPMENT),
+        quantity=random.randint(5, 25),
+        status=random.choice(["COLLECTION", "EMPTY_RETURN"]),
     )
-    print(f"Created inventory: {item_name}")
 
-# -------------------------------
-# Create Transactions
-print("Creating transactions...")
-all_users = list(UserModel.objects.all())
-all_customers = list(Customer.objects.all())
+print("  ✔ Distributions processed")
+
+# --------------------------------------------------
+print("🧾 Creating transactions (baseline only)...")
+
+customers = list(Customer.objects.all())
 
 for _ in range(NUM_TRANSACTIONS):
-    user = random.choice(all_users)
-    customer = random.choice(all_customers)
-    qty_14 = random.randint(0,5)
-    qty_50 = random.randint(0,3)
-    total_amount = qty_14*50 + qty_50*180  # simple pricing logic
-    timestamp = datetime.now() - timedelta(days=random.randint(0,30))
-    tx = Transaction.objects.create(
-        user=user,
-        customer=customer,
-        qty_14=qty_14,
-        qty_50=qty_50,
-        total_amount=total_amount,
+    Transaction.objects.create(
+        customer=random.choice(customers),
+        total_amount=Decimal(random.randint(150, 800)),
         is_paid=random.choice([True, False]),
-        created_at=timestamp
+        created_at=timezone.now() - timedelta(days=random.randint(0, 30)),
     )
-    print(f"Created transaction {tx.id} for {customer.name}")
 
-# -------------------------------
-# Create Distributions
-print("Creating distributions...")
-for _ in range(NUM_DISTRIBUTIONS):
-    depot = f"Depot {random.randint(1,3)}"
-    equipment = random_equipment()
-    quantity = random.randint(1,10)
-    status = random.choice(['collection','empty_return'])
-    dist = Distribution.objects.create(
-        depot=depot,
-        equipment=equipment,
-        quantity=quantity,
-        status=status
-    )
-    print(f"Created distribution: {equipment} ({status})")
+print("  ✔ Transactions created")
 
-print("✅ Test data loading complete!")
+# --------------------------------------------------
+print("\n✅ HSH test data loading COMPLETE")
 ```
 
 ---
 
-### ✅ Usage
-
-1. Place this script in a folder inside your Django project, e.g., `scripts/load_test_data.py`.
-2. Run it using Django's shell environment:
+## ▶️ Usage
 
 ```bash
+cd backend
 python manage.py shell < scripts/load_test_data.py
 ```
 
-or as a **management command**:
+---
 
-```bash
-python manage.py load_test_data
-```
+## 🔐 Why This Version Is Correct
+
+| Concern                | Status                     |
+| ---------------------- | -------------------------- |
+| Inventory safety       | ✅ No direct mutation       |
+| Audit integrity        | ✅ Auto-generated only      |
+| Service boundaries     | ✅ Distribution via service |
+| Postgres compatibility | ✅ Yes                      |
+| Model drift            | ❌ Eliminated               |
+| Future-proof           | ✅                          |
 
 ---
 
-### 🔹 Notes
+## 🚫 Intentionally NOT Included
 
-* Randomized, realistic values for users, customers, inventory, and transactions.
-* Can be **easily expanded** to include audit logs or PDF generation triggers.
-* Uses Django ORM → safe for MySQL, honors model constraints.
-* Offline queue / idempotency keys not included, but can be added by simulating offline payloads.
+* ❌ Manual `AuditLog` creation
+* ❌ Direct inventory updates
+* ❌ Fake meter readings
+* ❌ Hardcoded foreign keys
+
+Those are **system-critical paths** and must be exercised through real workflows.
 
 

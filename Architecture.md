@@ -1,74 +1,63 @@
-# 🏗️ HSH SALES SYSTEM — DESIGN & ARCHITECTURE (v3.0)
+# 🏗️ HSH SALES SYSTEM — DESIGN & ARCHITECTURE (v4.0)
+
+**Version:** 4.0 — MySQL-focused, full-stack architecture, offline-first, audit-ready
 
 ---
 
 ## 1️⃣ Executive Overview
 
-The **HSH Sales System** is a **full-stack LPG sales, delivery, and logistics platform** designed for **field operations, inventory integrity, billing accuracy, and regulatory auditability**.
+The **HSH Sales System** is a **full-stack platform for LPG sales, inventory, delivery, and auditing**, designed for:
 
-Key principles:
+* Field operations with **offline-first capability**
+* Backend authority with **immutable business rules**
+* Transparent, **audit-compliant workflows**
+* Role-based security and operational scalability
 
-* **Offline-first operation:** Field staff can continue sales and deliveries without network access.
-* **Backend authority:** Inventory, pricing, and transaction totals are **always validated server-side**.
-* **Auditability by design:** Every critical action is logged and immutable.
-* **Security-first:** JWT authentication, role-based access, and explicit trust boundaries.
+**Objectives:**
 
-### Core Operational Domains
+* Enable **field sales staff** to record transactions and deliveries offline.
+* Ensure **inventory integrity** and depot-scoped stock management.
+* Provide **real-time reconciliation** and automated reporting.
+* Maintain **audit trails** for regulatory and operational compliance.
 
-* **Field Operations**
+**Core Operational Domains:**
 
-  * Online/offline transaction capture
-  * Delivery and empty-return batch handling
-  * Immediate receipt printing
-
-* **Inventory Management**
-
-  * Real-time full/empty cylinder tracking
-  * Depot-scoped stock management
-  * Backend-enforced consistency rules
-
-* **Transaction & Billing**
-
-  * Meter, cylinder, service sales processing
-  * Automated invoice generation (PDF + email)
-  * Reconciliation and payment tracking
-
-* **Audit & Compliance**
-
-  * Immutable action logging
-  * Role-based access enforcement
-
-* **Reporting & Analytics**
-
-  * Filterable transaction history
-  * Exportable administrative reports (CSV/PDF)
+| Domain                    | Responsibilities                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------- |
+| **Field Operations**      | Online/offline transaction capture, delivery/empty-return processing, receipt printing |
+| **Inventory Management**  | Depot-specific full/empty cylinder tracking, stock reconciliation                      |
+| **Transaction & Billing** | Meter, cylinder, service sales, totals validation, automated invoices                  |
+| **Audit & Compliance**    | Immutable logging of critical actions, role-based access, timestamped events           |
+| **Reporting & Analytics** | Filterable transaction history, exportable administrative reports (CSV/PDF)            |
 
 ---
 
 ## 2️⃣ Technology Stack
 
-| Layer            | Technology                          | Architectural Role                |
-| ---------------- | ----------------------------------- | --------------------------------- |
-| Frontend         | React 18 (Vite), JSX, TailwindCSS   | Mobile-first UI, offline-capable  |
-| Routing          | React Router v7 (Data APIs)         | Loader + Action-driven workflows  |
-| Backend          | Django REST Framework (Python 3.11) | API, business logic, security     |
-| Database         | MySQL 8.0                           | ACID-compliant persistence        |
-| Authentication   | JWT (SimpleJWT) + RBAC              | Role-based trust enforcement      |
-| Offline Support  | LocalStorage queue + auto-sync      | Field resiliency                  |
-| Printing         | ESC/POS via Web Bluetooth           | Thermal receipt generation        |
-| Reporting        | ReportLab (PDF), CSV/Excel exports  | Invoices & administrative reports |
-| Containerization | Docker + Docker Compose             | Portable deployment               |
+| Layer                | Technology/Tool                     | Role                                                      |
+| -------------------- | ----------------------------------- | --------------------------------------------------------- |
+| **Frontend**         | React 18 + Vite, JSX, TailwindCSS   | Mobile-first SPA, offline-capable UI, print-ready layouts |
+| **Routing**          | React Router v7 (Loaders & Actions) | Data-driven routing and action-based state management     |
+| **Backend**          | Django REST Framework (Python 3.11) | API, business rules, domain services, authentication      |
+| **Database**         | MySQL 8.0                           | ACID-compliant relational store, primary source of truth  |
+| **Authentication**   | JWT (SimpleJWT), RBAC               | Role-based access, secure session handling                |
+| **Offline Support**  | LocalStorage + auto-sync            | Queue pending operations for offline usage                |
+| **Printing**         | ESC/POS via Web Bluetooth           | Thermal receipt printing for field operations             |
+| **Reporting**        | ReportLab (PDF), CSV/Excel          | Invoices and exportable reports                           |
+| **Containerization** | Docker + Docker Compose             | Portable deployment for backend/frontend/databases        |
+| **Monitoring**       | Sentry, Prometheus + Grafana        | Error tracking, performance monitoring, uptime            |
 
 ---
 
 ## 3️⃣ Design Principles
 
-1. **Strict frontend/backend separation** – UI never owns business truth.
-2. **Offline-first reliability** – Operations continue without connectivity.
-3. **Backend-owned invariants** – Inventory, pricing, numbering validated server-side.
-4. **Auditability by design** – All critical actions logged.
-5. **Role-based access control (RBAC)** – Clear Admin vs Sales responsibilities.
-6. **Operational portability** – Dockerized deployment, environment-driven configuration.
+1. **Strict Frontend/Backend Separation** – UI never stores authoritative state; backend is the source of truth.
+2. **Offline-first Reliability** – Field staff operations continue without connectivity.
+3. **Server-owned Invariants** – Inventory counts, pricing, transaction totals are validated server-side.
+4. **Auditability by Design** – All critical actions (create/update/delete) are logged immutably.
+5. **Role-based Access Control (RBAC)** – Clear separation: Admin, Sales, Supervisor, Delivery.
+6. **Operational Portability** – Dockerized deployments with environment-driven configuration.
+7. **Scalable Data Modeling** – Optimized for MySQL with FK constraints, indexes, and JSON storage where needed.
 
 ---
 
@@ -78,254 +67,284 @@ Key principles:
 
 ```
 Frontend (React SPA)
- ├─ Mobile-first UI
- ├─ React Router loaders & actions
- ├─ Offline queue (LocalStorage)
- └─ Thermal ESC/POS printing
+ ├─ Mobile-first responsive UI
+ ├─ React Router v7 (Loaders & Actions)
+ ├─ Offline queue for pending mutations (LocalStorage)
+ └─ Thermal ESC/POS printing for receipts
 
 Backend (Django REST Framework)
- ├─ JWT authentication + RBAC
- ├─ Domain services (Transactions, Distribution, Billing)
- ├─ Audit logging
- └─ PDF generation & email delivery
+ ├─ JWT Authentication + RBAC
+ ├─ Domain services:
+ │   ├─ TransactionService (totals, validation, stock deduction)
+ │   ├─ DistributionService (inventory movement)
+ │   ├─ BillingService (PDF/email)
+ │   ├─ ReportService (filtered reports)
+ │   └─ AuditService (immutable logs)
+ └─ MySQL database access (atomic transactions, constraints, triggers)
 
-Database (MySQL)
- ├─ Users, Customers, Inventory
- ├─ Transactions, Distributions
- └─ AuditLog
+Database (MySQL 8.0)
+ ├─ Normalized tables for Users, Customers, Inventory, Transactions, Distributions
+ ├─ JSON columns for flexible cylinder/service items
+ └─ AuditLog table for compliance trail
 ```
 
 ### 4.2 Container Architecture
 
 ```
-┌─────────┐   ┌─────────┐   ┌─────────────┐
-│Frontend │   │Backend  │   │MySQL        │
-│:5173    │   │:8000    │   │:3306        │
-│Vol:/app │   │Vol:/app │   │Vol:mysql_data
-└─────────┘   └─────────┘   └─────────────┘
+┌────────────┐     ┌─────────────┐     ┌───────────────┐
+│ Frontend   │     │ Backend     │     │ MySQL         │
+│ :5173      │     │ :8000       │     │ :3306         │
+│ Vol:/app   │     │ Vol:/app    │     │ Vol:mysql_data│
+└────────────┘     └─────────────┘     └───────────────┘
 ```
 
 ---
 
 ## 5️⃣ Domain Modules
 
-| Module           | Responsibility                                       |
-| ---------------- | ---------------------------------------------------- |
-| **Accounts**     | User auth, JWT, RBAC                                 |
-| **Customers**    | Profiles, pricing tiers, payment methods             |
-| **Inventory**    | Full/empty cylinder stock, depot allocation          |
-| **Distribution** | Delivery batches, empty returns, inventory movement  |
-| **Transactions** | Sales creation, totals, stock deduction              |
-| **Billing**      | PDF invoice generation and email dispatch            |
-| **Reports**      | Filtered transaction history, administrative exports |
-| **Audit**        | Immutable logging of critical actions                |
-| **Frontend**     | Offline-first SPA, printing, routing                 |
+| Module           | Responsibilities                                               |
+| ---------------- | -------------------------------------------------------------- |
+| **Accounts**     | Users, roles, JWT auth, RBAC                                   |
+| **Customers**    | Profiles, pricing tiers, contact info, payment terms           |
+| **Inventory**    | Depot-based stock, full/empty cylinder tracking, service items |
+| **Distribution** | Delivery batches, empty-return handling, inventory movement    |
+| **Transactions** | Sales creation, total calculation, stock deduction             |
+| **Billing**      | Invoice generation (PDF), automated email dispatch             |
+| **Reports**      | Filterable, exportable transaction history, financial reports  |
+| **Audit**        | Immutable logging for compliance, non-repudiable actions       |
+| **Frontend**     | SPA offline-first operations, queue replay, printing, routing  |
 
 ---
 
-## 6️⃣ Data Model Overview
+## 6️⃣ Data Model & Detailed ERD
 
-### 6.1 Core Entities & Fields
+### 6.1 Users
 
-| Entity           | Key Fields (with types)                                                                                                                                                                          | Notes              |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
-| **User**         | id (PK), username (str), role (enum: Admin/Sales/Supervisor), vehicle_no (str), email, created_at, updated_at                                                                                    | Admin/Sales users  |
-| **Customer**     | id (PK), name (str), contact_no (str), address (str), payment_type (enum: Cash/Credit), rate_14kg (decimal), rate_50kg (decimal), active (bool), created_at, updated_at                          | Pricing authority  |
-| **Inventory**    | id (PK), item_name (str), item_type (enum: Cylinder/Meter/Service), full_qty (int), empty_qty (int), depot_id (FK), last_updated                                                                 | Depot-scoped stock |
-| **Distribution** | id (PK), distribution_no (str), user_id (FK), item_id (FK), quantity (int), status (enum: Pending/Completed/Cancelled), created_at, delivered_at                                                 | Delivery batches   |
-| **Transaction**  | id (PK), customer_id (FK), user_id (FK), meter_qty (decimal), cylinder_items (JSON), service_items (JSON), total_amount (decimal), is_paid (bool), payment_method (enum), created_at, updated_at | Sales records      |
-| **AuditLog**     | id (PK), user_id (FK), action_type (enum), payload (JSON), timestamp, ip_address, device_info                                                                                                    | Compliance trail   |
+| Field      | Type                                          | Key/Constraint                                        | Description               |
+| ---------- | --------------------------------------------- | ----------------------------------------------------- | ------------------------- |
+| id         | BIGINT UNSIGNED                               | PK, AI                                                | Unique user identifier    |
+| username   | VARCHAR(50)                                   | UNIQUE, NOT NULL                                      | Login username            |
+| email      | VARCHAR(100)                                  | UNIQUE                                                | Email                     |
+| password   | VARCHAR(128)                                  | NOT NULL                                              | Hashed password           |
+| role       | ENUM('Admin','Sales','Supervisor','Delivery') | NOT NULL                                              | User role                 |
+| vehicle_no | VARCHAR(20)                                   | NULLABLE                                              | Assigned delivery vehicle |
+| created_at | DATETIME                                      | DEFAULT CURRENT_TIMESTAMP                             | Creation timestamp        |
+| updated_at | DATETIME                                      | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Last update               |
 
----
+### 6.2 Customers
 
-### 6.2 Enhanced ERD (with fields)
+| Field        | Type                  | Key/Constraint                                        | Description             |
+| ------------ | --------------------- | ----------------------------------------------------- | ----------------------- |
+| id           | BIGINT UNSIGNED       | PK, AI                                                | Customer identifier     |
+| name         | VARCHAR(100)          | NOT NULL                                              | Customer name           |
+| contact_no   | VARCHAR(20)           | NULLABLE                                              | Phone number            |
+| address      | VARCHAR(255)          | NULLABLE                                              | Physical address        |
+| payment_type | ENUM('Cash','Credit') | NOT NULL                                              | Payment preference      |
+| rate_14kg    | DECIMAL(8,2)          | NOT NULL                                              | Price per 14kg cylinder |
+| rate_50kg    | DECIMAL(10,2)         | NOT NULL                                              | Price per 50kg cylinder |
+| active       | BOOLEAN               | DEFAULT TRUE                                          | Active customer flag    |
+| created_at   | DATETIME              | DEFAULT CURRENT_TIMESTAMP                             | Creation timestamp      |
+| updated_at   | DATETIME              | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Last update             |
 
-```
-+-------------------------+
-|        User             |
-|-------------------------|
-| id (PK)                 |
-| username                |
-| role                    |
-| vehicle_no              |
-| email                   |
-| created_at              |
-| updated_at              |
-+-------------------------+
-       |
-       |1
-       *
-+-------------------------+
-|     Transaction         |
-|-------------------------|
-| id (PK)                 |
-| customer_id (FK)        |
-| user_id (FK)            |
-| meter_qty               |
-| cylinder_items (JSON)   |
-| service_items (JSON)    |
-| total_amount            |
-| is_paid                 |
-| payment_method          |
-| created_at              |
-| updated_at              |
-+-------------------------+
-       |
-       *
-+-------------------------+
-|      Customer           |
-|-------------------------|
-| id (PK)                 |
-| name                    |
-| contact_no              |
-| address                 |
-| payment_type            |
-| rate_14kg               |
-| rate_50kg               |
-| active                  |
-| created_at              |
-| updated_at              |
-+-------------------------+
+### 6.3 Inventory
 
-+-------------------------+
-|    Distribution         |
-|-------------------------|
-| id (PK)                 |
-| distribution_no         |
-| user_id (FK)            |
-| item_id (FK)            |
-| quantity                |
-| status                  |
-| created_at              |
-| delivered_at            |
-+-------------------------+
-       |
-       *
-+-------------------------+
-|      Inventory          |
-|-------------------------|
-| id (PK)                 |
-| item_name               |
-| item_type               |
-| full_qty                |
-| empty_qty               |
-| depot_id (FK)           |
-| last_updated            |
-+-------------------------+
+| Field        | Type                               | Key/Constraint                                        | Description                 |
+| ------------ | ---------------------------------- | ----------------------------------------------------- | --------------------------- |
+| id           | BIGINT UNSIGNED                    | PK, AI                                                | Inventory item ID           |
+| depot_id     | BIGINT UNSIGNED                    | FK → Depot(id)                                        | Depot location              |
+| item_name    | VARCHAR(50)                        | NOT NULL                                              | Cylinder/Meter/Service name |
+| item_type    | ENUM('Cylinder','Meter','Service') | NOT NULL                                              | Item category               |
+| full_qty     | INT UNSIGNED                       | NOT NULL                                              | Full cylinder quantity      |
+| empty_qty    | INT UNSIGNED                       | NOT NULL                                              | Empty cylinder quantity     |
+| last_updated | DATETIME                           | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Last update                 |
 
-+-------------------------+
-|       AuditLog          |
-|-------------------------|
-| id (PK)                 |
-| user_id (FK)            |
-| action_type             |
-| payload (JSON)          |
-| timestamp               |
-| ip_address              |
-| device_info             |
-+-------------------------+
-```
+### 6.4 Distribution
 
-**Notes:**
+| Field           | Type                                    | Key/Constraint            | Description                   |
+| --------------- | --------------------------------------- | ------------------------- | ----------------------------- |
+| id              | BIGINT UNSIGNED                         | PK, AI                    | Distribution ID               |
+| distribution_no | VARCHAR(20)                             | UNIQUE                    | System-generated batch number |
+| user_id         | BIGINT UNSIGNED                         | FK → User(id)             | Responsible staff             |
+| item_id         | BIGINT UNSIGNED                         | FK → Inventory(id)        | Item distributed              |
+| quantity        | INT UNSIGNED                            | NOT NULL                  | Quantity moved                |
+| status          | ENUM('Pending','Completed','Cancelled') | NOT NULL                  | Current batch status          |
+| created_at      | DATETIME                                | DEFAULT CURRENT_TIMESTAMP | Creation timestamp            |
+| delivered_at    | DATETIME                                | NULLABLE                  | Completion timestamp          |
 
-* `Transaction.cylinder_items` and `service_items` store **typed quantities per category** in JSON (e.g., `{"9kg":2, "12.7kg":3}`).
-* `AuditLog.payload` captures **full before/after context** for non-repudiation.
-* `Inventory` tracks **full/empty quantities per depot**, updated atomically via backend services.
+### 6.5 Transactions
+
+| Field          | Type                           | Key/Constraint                                        | Description                |
+| -------------- | ------------------------------ | ----------------------------------------------------- | -------------------------- |
+| id             | BIGINT UNSIGNED                | PK, AI                                                | Transaction ID             |
+| customer_id    | BIGINT UNSIGNED                | FK → Customer(id)                                     | Customer                   |
+| user_id        | BIGINT UNSIGNED                | FK → User(id)                                         | Salesperson                |
+| meter_qty      | DECIMAL(10,2)                  | DEFAULT 0                                             | Meter quantity sold        |
+| cylinder_items | JSON                           | NOT NULL                                              | `{"9kg":2,"12.7kg":3}`     |
+| service_items  | JSON                           | NOT NULL                                              | `{"Regulator":1,"Hose":2}` |
+| total_amount   | DECIMAL(12,2)                  | NOT NULL                                              | Total sale amount          |
+| is_paid        | BOOLEAN                        | DEFAULT FALSE                                         | Payment status             |
+| payment_method | ENUM('Cash','Credit','Wallet') | NOT NULL                                              | Payment method             |
+| created_at     | DATETIME                       | DEFAULT CURRENT_TIMESTAMP                             | Creation timestamp         |
+| updated_at     | DATETIME                       | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Last update                |
+
+### 6.6 AuditLog
+
+| Field       | Type                                              | Key/Constraint            | Description             |
+| ----------- | ------------------------------------------------- | ------------------------- | ----------------------- |
+| id          | BIGINT UNSIGNED                                   | PK, AI                    | Audit record ID         |
+| user_id     | BIGINT UNSIGNED                                   | FK → User(id)             | Actor                   |
+| action_type | ENUM('CREATE','UPDATE','DELETE','LOGIN','LOGOUT') | NOT NULL                  | Type of action          |
+| payload     | JSON                                              | NULLABLE                  | Before/After context    |
+| timestamp   | DATETIME                                          | DEFAULT CURRENT_TIMESTAMP | When action occurred    |
+| ip_address  | VARCHAR(45)                                       | NULLABLE                  | Source IP               |
+| device_info | VARCHAR(255)                                      | NULLABLE                  | Browser/device metadata |
 
 ---
 
-## 7️⃣ Backend Architecture
+## 7️⃣ ASCII ERD with Relationships
 
-* **Configuration:** Environment-based settings, MySQL strict mode, JWT auth, modular Django apps
-* **Domain Services:**
+```
++---------------------------+
+|           User            |
+|---------------------------|
+| id           BIGINT PK    |
+| username     VARCHAR(50)  |
+| email        VARCHAR(100) |
+| password     VARCHAR(128) |
+| role         ENUM(...)    |
+| vehicle_no   VARCHAR(20)  |
+| created_at   DATETIME     |
+| updated_at   DATETIME     |
++---------------------------+
+           1
+           |
+           | *
++---------------------------+
+|       Transaction         |
+|---------------------------|
+| id             BIGINT PK  |
+| customer_id    BIGINT FK → Customer.id |
+| user_id        BIGINT FK → User.id     |
+| meter_qty      DECIMAL(10,2)           |
+| cylinder_items JSON             |
+| service_items  JSON             |
+| total_amount   DECIMAL(12,2)           |
+| is_paid        BOOLEAN                  |
+| payment_method ENUM('Cash','Credit','Wallet') |
+| created_at     DATETIME                 |
+| updated_at     DATETIME                 |
++---------------------------+
+           *
+           |
+           1
++---------------------------+
+|        Customer           |
+|---------------------------|
+| id            BIGINT PK   |
+| name          VARCHAR(100)|
+| contact_no    VARCHAR(20) |
+| address       VARCHAR(255)|
+| payment_type  ENUM('Cash','Credit') |
+| rate_14kg     DECIMAL(8,2)  |
+| rate_50kg     DECIMAL(10,2) |
+| active        BOOLEAN       |
+| created_at    DATETIME      |
+| updated_at    DATETIME      |
++---------------------------+
 
-  * TransactionService → totals, inventory deduction
-  * DistributionService → batch creation, inventory movement
-  * BillingService → PDF/email dispatch
-  * ReportService → filtered reports
-  * AuditService → immutable logging
-* **Security:** JWT + RBAC, atomic updates, server-generated IDs, audit logging
++---------------------------+
+|        Distribution       |
+|---------------------------|
+| id              BIGINT PK |
+| distribution_no VARCHAR(20) UNIQUE |
+| user_id         BIGINT FK → User.id |
+| item_id         BIGINT FK → Inventory.id |
+| quantity        INT UNSIGNED        |
+| status          ENUM('Pending','Completed','Cancelled') |
+| created_at      DATETIME            |
+| delivered_at    DATETIME NULLABLE   |
++---------------------------+
+           *
+           |
+           1
++---------------------------+
+|        Inventory          |
+|---------------------------|
+| id           BIGINT PK     |
+| depot_id     BIGINT FK → Depot.id  |
+| item_name    VARCHAR(50)   |
+| item_type    ENUM('Cylinder','Meter','Service') |
+| full_qty     INT UNSIGNED  |
+| empty_qty    INT UNSIGNED  |
+| last_updated DATETIME      |
++---------------------------+
+
++---------------------------+
+|        AuditLog           |
+|---------------------------|
+| id          BIGINT PK      |
+| user_id     BIGINT FK → User.id |
+| action_type ENUM('CREATE','UPDATE','DELETE','LOGIN','LOGOUT') |
+| payload     JSON             |
+| timestamp   DATETIME       |
+| ip_address  VARCHAR(45)    |
+| device_info VARCHAR(255)   |
++---------------------------+
+```
 
 ---
 
-## 8️⃣ Frontend Architecture
-
-* React SPA (Vite, JSX)
-* React Router v7 loaders & actions
-* TailwindCSS, mobile-first
-* Offline queue (`offline.js`)
-* Thermal printing (`usePrinter.js`)
-* Root layout manages routing, auth, and layout shell
-
-**Offline Strategy:** Mutations queued locally and replayed automatically when connectivity is restored.
-
----
-
-## 9️⃣ Transaction & Distribution Flow
-
-### 9.1 Transaction Creation
+## 8️⃣ Offline-First Flow Diagram
 
 ```
-User
- │
- ▼
-React SPA UI
- │
- ▼
-Router Action
- │
- ├─ Offline → Queue locally
- │
- └─ Online → POST /api/transactions/
-        │
-        ▼
-TransactionService → MySQL (atomic)
-        │
-        ▼
-AuditLog → Frontend confirmation → Optional Print
+                     ┌───────────────────────┐
+                     │    React SPA Frontend │
+                     │  (Vite, JSX, Tailwind)│
+                     └─────────┬─────────────┘
+                               │
+                 ┌─────────────┴─────────────┐
+                 │ Offline Queue (LocalStorage)│
+                 └─────────────┬─────────────┘
+                               │
+             ┌─────────────────┴─────────────────┐
+             │ Network Available?                 │
+             │  ┌─────────────┐                   │
+             │  │ Yes         │                   │
+             │  │ POST /api/transactions       │
+             │  └─────────────┘                   │
+             │                                     │
+             │  ┌─────────────┐                   │
+             │  │ No (Offline)│                   │
+             │  │ Keep queued │                   │
+             │  │ mutation    │                   │
+             │  └─────────────┘                   │
+             └─────────────┬─────────────┘
+                           │
+             ┌─────────────▼─────────────┐
+             │  Django REST Framework    │
+             │  Backend API Services     │
+             │ ┌───────────────────────┐│
+             │ │ TransactionService    ││
+             │ │  - Validate totals    ││
+             │ │  - Deduct inventory   ││
+             │ └───────────────────────┘│
+             │ ┌───────────────────────┐│
+             │ │ DistributionService   ││
+             │ │  - Update inventory   ││
+             │ └───────────────────────┘│
+             │ ┌───────────────────────┐│
+             │ │ AuditService          ││
+             │ │  - Log mutation       ││
+             │ │  - Capture JSON state ││
+             │ └───────────────────────┘│
+             └─────────────┬─────────────┘
+                           │
+            ┌──────────────▼──────────────┐
+            │        MySQL Database       │
+            └──────────────┬─────────────┘
+                           │
+            ┌──────────────▼─────────────┐
+            │ Frontend Confirmation/UI   │
+            └───────────────────────────┘
 ```
-
-### 9.2 Delivery/Distribution Batch
-
-```
-User
- │
- ▼
-React SPA UI
- │
- ▼
-Router Action
- │
- ├─ Offline → Queue batch
- │
- └─ Online → POST /api/distributions/
-        │
-        ▼
-DistributionService → Inventory movement
-        │
-        ▼
-AuditLog → UI confirmation → Optional Print
-```
-
-### 9.3 Failure & Recovery Pattern
-
-```
-Network/API failure
- │
- ▼
-Router Action → Catches error
- │
- ▼
-Queue persists payload
- │
- ▼
-UI indicates "Saved Offline"
- │
- ▼
-Network restored
- │
- ▼
-Queued mutations replayed → Backend commits & audits
-```
-
 
